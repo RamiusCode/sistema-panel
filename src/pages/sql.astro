@@ -1,0 +1,218 @@
+---
+// Página de instalación: muestra los archivos .sql de la carpeta supabase/
+// con un botón para copiarlos.
+//
+// Existe porque copiar un archivo de 400 líneas desde el explorador de
+// Windows es incómodo y fácil de hacer a medias. Acá se aprieta un botón.
+//
+// Los archivos se leen al compilar, así que lo que se ve es siempre lo que
+// hay en la carpeta: si se agrega un .sql nuevo, aparece solo.
+import fs from "node:fs";
+import path from "node:path";
+
+const carpeta = path.join(process.cwd(), "supabase");
+
+const archivos = fs.existsSync(carpeta)
+  ? fs
+      .readdirSync(carpeta)
+      .filter((n) => n.endsWith(".sql"))
+      .sort()
+      .map((nombre) => ({
+        nombre,
+        contenido: fs.readFileSync(path.join(carpeta, nombre), "utf8"),
+      }))
+  : [];
+---
+
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Textos para Supabase</title>
+    <style>
+      :root {
+        --fondo: #070b11;
+        --panel: #0e141d;
+        --panel-alto: #141c27;
+        --borde: #1f2b3a;
+        --borde-suave: #172231;
+        --texto: #e3edf5;
+        --texto-tenue: #7d8fa5;
+        --neon: #00f5a0;
+        --neon-fondo: rgba(0, 245, 160, 0.12);
+        --neon-brillo: rgba(0, 245, 160, 0.35);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--fondo);
+        color: var(--texto);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        line-height: 1.5;
+      }
+      .envoltorio { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+      h1 { font-size: 1.5rem; margin: 0 0 .35rem; }
+      .bajada { color: var(--texto-tenue); margin: 0 0 2rem; font-size: .92rem; }
+
+      .paso {
+        display: flex;
+        gap: .8rem;
+        align-items: flex-start;
+        background: var(--panel);
+        border: 1px solid var(--borde-suave);
+        border-radius: 12px;
+        padding: .85rem 1rem;
+        margin-bottom: .6rem;
+        font-size: .92rem;
+      }
+      .paso b {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: var(--neon-fondo);
+        color: var(--neon);
+        font-size: .8rem;
+      }
+
+      .archivo {
+        background: var(--panel);
+        border: 1px solid var(--borde);
+        border-radius: 14px;
+        margin-top: 1.75rem;
+        overflow: hidden;
+      }
+      .archivo-cabecera {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .9rem 1.1rem;
+        border-bottom: 1px solid var(--borde-suave);
+        background: var(--panel-alto);
+      }
+      .archivo-nombre { font-weight: 600; font-size: .95rem; }
+      .archivo-lineas { color: var(--texto-tenue); font-size: .8rem; }
+
+      .btn-copiar {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        border: 0;
+        border-radius: 999px;
+        padding: .5rem 1.1rem;
+        font: inherit;
+        font-size: .87rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--neon);
+        color: #04120c;
+        box-shadow: 0 0 0 0 var(--neon-brillo);
+        transition: box-shadow .2s, transform .1s;
+        white-space: nowrap;
+      }
+      .btn-copiar:hover { box-shadow: 0 0 18px var(--neon-brillo); }
+      .btn-copiar:active { transform: translateY(1px); }
+      .btn-copiar svg { width: 15px; height: 15px; }
+      .btn-copiar.hecho { background: var(--panel-alto); color: var(--neon); }
+
+      pre {
+        margin: 0;
+        padding: 1rem 1.1rem;
+        max-height: 340px;
+        overflow: auto;
+        font-size: .78rem;
+        line-height: 1.55;
+        color: var(--texto-tenue);
+        white-space: pre;
+      }
+
+      .nota {
+        margin-top: 2rem;
+        background: var(--neon-fondo);
+        border-left: 3px solid var(--neon);
+        border-radius: 10px;
+        padding: .9rem 1.1rem;
+        font-size: .88rem;
+      }
+      .vacio { color: var(--texto-tenue); }
+    </style>
+  </head>
+
+  <body>
+    <div class="envoltorio">
+      <h1>Textos para Supabase</h1>
+      <p class="bajada">Copiá el texto y pegalo en Supabase. Es todo.</p>
+
+      <div class="paso"><b>1</b><span>En Supabase, menú de la izquierda → <strong>SQL Editor</strong> (el ícono <code>&gt;_</code>)</span></div>
+      <div class="paso"><b>2</b><span>Apretá <strong>New query</strong></span></div>
+      <div class="paso"><b>3</b><span>Apretá <strong>Copiar</strong> acá abajo y pegá con <strong>Ctrl + V</strong></span></div>
+      <div class="paso"><b>4</b><span>Apretá <strong>Run</strong>. Si sale un cartel de advertencia, apretá <strong>Run query</strong> igual: es normal</span></div>
+      <div class="paso"><b>5</b><span>Tiene que decir <strong style="color:var(--neon)">Success. No rows returned</strong></span></div>
+
+      {archivos.length === 0 && <p class="vacio">No hay archivos .sql en la carpeta supabase/</p>}
+
+      {
+        archivos.map((a) => (
+          <div class="archivo">
+            <div class="archivo-cabecera">
+              <div>
+                <div class="archivo-nombre">{a.nombre}</div>
+                <div class="archivo-lineas">{a.contenido.split("\n").length} líneas</div>
+              </div>
+              <button class="btn-copiar" type="button" data-copiar={a.nombre}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                Copiar
+              </button>
+            </div>
+            <pre data-contenido={a.nombre}>{a.contenido}</pre>
+          </div>
+        ))
+      }
+
+      <p class="nota">
+        Se puede correr más de una vez sin romper nada. Si algo sale mal, volvés
+        acá, copiás de nuevo y lo corrés otra vez.
+      </p>
+    </div>
+
+    <script>
+      for (const boton of document.querySelectorAll("[data-copiar]")) {
+        boton.addEventListener("click", async () => {
+          const nombre = boton.getAttribute("data-copiar");
+          const bloque = document.querySelector(`[data-contenido="${nombre}"]`);
+          if (!bloque) return;
+
+          const texto = bloque.textContent ?? "";
+
+          try {
+            await navigator.clipboard.writeText(texto);
+          } catch {
+            // Sin permiso de portapapeles (pasa fuera de https): se selecciona
+            // el texto para que se pueda copiar a mano con Ctrl+C.
+            const rango = document.createRange();
+            rango.selectNodeContents(bloque);
+            const seleccion = window.getSelection();
+            seleccion?.removeAllRanges();
+            seleccion?.addRange(rango);
+          }
+
+          const original = boton.innerHTML;
+          boton.classList.add("hecho");
+          boton.textContent = "¡Copiado!";
+          setTimeout(() => {
+            boton.classList.remove("hecho");
+            boton.innerHTML = original;
+          }, 1800);
+        });
+      }
+    </script>
+  </body>
+</html>

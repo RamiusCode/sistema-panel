@@ -1,0 +1,2447 @@
+---
+// src/pages/admin.astro
+// Panel de administración de invitados. Tema oscuro, tipografía de sistema.
+// No comparte estilos con la invitación: es una herramienta, no papelería.
+---
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#070b11" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" href="/iconos/Anillos.png" />
+    <title>Panel de invitados</title>
+
+    <style is:global>
+      /* ═══════════════════════════════════════════════════════════
+         TEMA OSCURO
+         Sin Tailwind aquí: el panel es una herramienta aparte y así
+         no arrastra el CSS de la invitación ni pelea con su paleta.
+         ═══════════════════════════════════════════════════════════ */
+      :root {
+        --fondo:         #070b11;
+        --panel:         #0e141d;
+        --panel-alto:    #141c27;
+        --borde:         #1f2b3a;
+        --borde-suave:   #172231;
+        --texto:         #e3edf5;
+        --texto-tenue:   #7d8fa5;
+        --neon:          #00f5a0;
+        --neon-claro:    #5cffc4;
+        --neon-fondo:    rgba(0, 245, 160, 0.12);
+        --neon-brillo:   rgba(0, 245, 160, 0.35);
+        --peligro:       #ff4d6d;
+        --peligro-fondo: rgba(255, 77, 109, 0.12);
+        --sombra:        0 4px 20px rgba(0, 0, 0, 0.55);
+        --radio:         9px;
+
+        color-scheme: dark;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body { height: 100%; }
+
+      body {
+        background: var(--fondo);
+        color: var(--texto);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto,
+                     "Helvetica Neue", Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button, input, select { font: inherit; color: inherit; }
+      button { cursor: pointer; background: none; border: none; }
+      .oculto { display: none !important; }
+
+      /* ── Campos ── */
+      .campo {
+        width: 100%;
+        background: var(--fondo);
+        border: 1px solid var(--borde);
+        border-radius: var(--radio);
+        padding: 0.6rem 0.85rem;
+        outline: none;
+        transition: border-color .15s, box-shadow .15s;
+      }
+      .campo:focus {
+        border-color: var(--neon);
+        box-shadow: 0 0 0 3px var(--neon-fondo);
+      }
+      .campo::placeholder { color: #56637a; }
+
+      .etiqueta {
+        display: block;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--texto-tenue);
+        margin-bottom: 0.4rem;
+      }
+
+      /* ── Botones ── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        border-radius: var(--radio);
+        padding: 0.55rem 1.1rem;
+        font-size: 0.9rem;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: background .15s, border-color .15s, opacity .15s;
+      }
+      .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+      .btn-neon {
+        background: var(--neon);
+        color: #04120c;
+        font-weight: 600;
+        box-shadow: 0 0 14px var(--neon-brillo);
+      }
+      .btn-neon:hover:not(:disabled) {
+        background: var(--neon-claro);
+        box-shadow: 0 0 22px var(--neon-brillo);
+      }
+
+      .btn-linea      { border: 1px solid var(--borde); color: var(--texto-tenue); }
+      .btn-linea:hover{ border-color: var(--neon); color: var(--neon); background: var(--neon-fondo); }
+
+      .btn-peligro    { border: 1px solid rgba(255,77,109,.4); color: var(--peligro); }
+      .btn-peligro:hover { background: var(--peligro-fondo); border-color: var(--peligro); }
+
+      .btn-chico { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+
+      /* ── Tarjetas ── */
+      .tarjeta {
+        background: var(--panel);
+        border: 1px solid var(--borde-suave);
+        border-radius: 14px;
+        box-shadow: var(--sombra);
+      }
+      .tarjeta-cabecera {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--borde-suave);
+      }
+      /* Buscador y botones en una sola línea: el que cede es el buscador,
+         que se encoge, en vez de empujar los botones a otro renglón. */
+      .barra-acciones {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        flex-wrap: nowrap;
+      }
+      .barra-acciones .campo {
+        flex: 1 1 150px;
+        min-width: 0;
+        max-width: 230px;
+      }
+      .barra-acciones .btn { white-space: nowrap; flex: none; }
+      /* En celular sí se apila, si no no entra */
+      @media (max-width: 620px) {
+        .barra-acciones { flex-wrap: wrap; }
+        .barra-acciones .campo { flex: 1 1 100%; max-width: none; }
+      }
+
+      .tarjeta-titulo {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--neon);
+      }
+      .tarjeta-cuerpo { padding: 1.25rem; }
+
+      /* ═══ ESTRUCTURA ═══ */
+      .disposicion { display: flex; min-height: 100vh; }
+
+      /* ── Barra lateral ── */
+      .lateral {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 250px;
+        background: var(--panel);
+        border-right: 1px solid var(--borde-suave);
+        display: flex;
+        flex-direction: column;
+        z-index: 40;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+      }
+      .lateral.abierta { transform: translateX(0); }
+
+      .lateral-marca {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--borde-suave);
+      }
+      .lateral-marca strong {
+        display: block;
+        font-size: 1rem;
+        letter-spacing: 0.02em;
+      }
+      .lateral-marca span {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--texto-tenue);
+        margin-top: 0.15rem;
+      }
+
+      .lateral-menu { padding: 0.75rem; flex: 1; }
+      .lateral-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        width: 100%;
+        padding: 0.65rem 0.8rem;
+        border-radius: var(--radio);
+        color: var(--texto-tenue);
+        font-size: 0.92rem;
+        text-align: left;
+        transition: background .15s, color .15s;
+      }
+      .lateral-item:hover { background: var(--panel-alto); color: var(--texto); }
+      .lateral-item.activo {
+        position: relative;
+        background: var(--neon-fondo);
+        color: var(--neon);
+        font-weight: 500;
+      }
+      .lateral-item.activo::before {
+        content: "";
+        position: absolute;
+        left: 0; top: 20%; bottom: 20%;
+        width: 3px;
+        border-radius: 999px;
+        background: var(--neon);
+        box-shadow: 0 0 10px var(--neon-brillo);
+      }
+      .lateral-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+      .lateral-pie {
+        padding: 0.75rem;
+        border-top: 1px solid var(--borde-suave);
+        font-size: 0.78rem;
+        color: var(--texto-tenue);
+      }
+
+      .velo {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 35;
+      }
+
+      /* ── Zona principal ── */
+      .principal { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+      .superior {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.85rem 1rem;
+        background: rgba(14, 20, 29, 0.92);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--borde-suave);
+      }
+      .superior h1 { font-size: 1rem; font-weight: 600; }
+
+      .icono-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px; height: 38px;
+        border-radius: var(--radio);
+        color: var(--texto-tenue);
+        flex-shrink: 0;
+      }
+      .icono-btn:hover { background: var(--panel-alto); color: var(--texto); }
+      .icono-btn svg { width: 20px; height: 20px; }
+
+      .contenido {
+        padding: 1.25rem 1rem 3rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        max-width: 1100px;
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      /* ── Cajas de resumen ── */
+      .resumen {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+        gap: 0.85rem;
+      }
+      .caja-num {
+        background: var(--panel);
+        border: 1px solid var(--borde-suave);
+        border-left: 3px solid var(--neon);
+        border-radius: 14px;
+        padding: 1rem 1.15rem;
+      }
+      .caja-num span {
+        display: block;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--texto-tenue);
+      }
+      .caja-num strong {
+        display: block;
+        font-size: 1.9rem;
+        font-weight: 600;
+        line-height: 1.2;
+        margin-top: 0.2rem;
+      }
+
+      /* ── Interruptor ── */
+      .fila-switch {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        cursor: pointer;
+      }
+      .switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+      .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+      .switch i {
+        position: absolute;
+        inset: 0;
+        background: #33404f;
+        border-radius: 999px;
+        transition: background .2s;
+        pointer-events: none;
+      }
+      .switch i::after {
+        content: "";
+        position: absolute;
+        top: 3px; left: 3px;
+        width: 20px; height: 20px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform .2s;
+      }
+      .switch input:checked + i {
+        background: var(--neon);
+        box-shadow: 0 0 12px var(--neon-brillo);
+      }
+      .switch input:checked + i::after { transform: translateX(20px); }
+
+      /* ── Avisos ── */
+      .aviso {
+        border-radius: 14px;
+        padding: 0.9rem 1.1rem;
+        font-size: 0.9rem;
+        border: 1px solid;
+      }
+      .aviso-atencion {
+        background: var(--neon-fondo);
+        border-color: rgba(0,245,160,.35);
+        color: var(--neon-claro);
+      }
+      .aviso-error {
+        background: var(--peligro-fondo);
+        border-color: rgba(255,77,109,.35);
+        color: var(--peligro);
+      }
+
+      /* ── Formulario de alta ── */
+      .form-alta { display: grid; gap: 0.85rem; }
+
+      /* ── Tabla ── */
+      .tabla { width: 100%; border-collapse: collapse; }
+      .tabla th {
+        text-align: left;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--texto-tenue);
+        font-weight: 600;
+        padding: 0.7rem 1.25rem;
+        border-bottom: 1px solid var(--borde-suave);
+        background: var(--panel-alto);
+      }
+      .tabla td {
+        padding: 0.7rem 1.25rem;
+        border-bottom: 1px solid var(--borde-suave);
+        vertical-align: middle;
+      }
+      /* La columna de acciones no se parte nunca */
+      .tabla td.col-acciones { white-space: nowrap; width: 1%; }
+      .tabla tr:last-child td { border-bottom: none; }
+      .tabla tbody tr:hover { background: var(--panel-alto); }
+
+      .celda-nombre { font-weight: 500; }
+      .celda-link {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.78rem;
+        color: var(--texto-tenue);
+        max-width: 250px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pastilla {
+        display: inline-block;
+        background: var(--neon-fondo);
+        color: var(--neon);
+        border-radius: 999px;
+        padding: 0.15rem 0.65rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      /* Etiquetas del estado de confirmación */
+      .marca-conf {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 0.15rem 0.65rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .marca-si {
+        background: var(--neon-fondo);
+        color: var(--neon);
+      }
+      .marca-no {
+        background: var(--peligro-fondo);
+        color: var(--peligro);
+      }
+      .marca-pendiente {
+        background: rgba(125, 143, 165, 0.14);
+        color: var(--texto-tenue);
+      }
+      /* Halo que parpadea una vez cuando una fila cambia en vivo */
+      @keyframes destello-fila {
+        from { background: var(--neon-fondo); }
+        to   { background: transparent; }
+      }
+      .fila-nueva td { animation: destello-fila 1.6s ease-out; }
+      /* Indicador de conexión en vivo */
+      .punto-vivo {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.78rem;
+        color: var(--texto-tenue);
+        opacity: 0.45;
+        transition: opacity 0.3s;
+      }
+      .punto-vivo i {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--texto-tenue);
+      }
+      .punto-vivo.vivo { opacity: 1; color: var(--neon); }
+      .punto-vivo.vivo i {
+        background: var(--neon);
+        box-shadow: 0 0 0 0 var(--neon-brillo);
+        animation: latido-vivo 2s ease-out infinite;
+      }
+      @keyframes latido-vivo {
+        70%  { box-shadow: 0 0 0 7px rgba(0, 245, 160, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(0, 245, 160, 0); }
+      }
+      @media (max-width: 560px) {
+        .punto-vivo span { display: none; }
+      }
+      /* En escritorio los botones van en una sola línea. Antes se envolvían
+         en columna y dejaban las filas larguísimas. */
+      .acciones {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 0.4rem;
+        justify-content: flex-end;
+      }
+
+      .vacio { padding: 2.5rem 1.25rem; text-align: center; color: var(--texto-tenue); }
+      /* Casillas de funciones contratadas */
+      .funciones-caja {
+        display: flex;
+        flex-direction: column;
+        gap: .55rem;
+        padding: .75rem .9rem;
+        border: 1px solid var(--borde);
+        border-radius: 10px;
+        background: var(--panel-alto);
+      }
+      .funciones-caja label {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        font-size: .88rem;
+        cursor: pointer;
+      }
+      .funciones-caja input { accent-color: var(--neon); width: 16px; height: 16px; }
+      /* Etiquetas chicas que listan las funciones de cada boda */
+      .etiqueta-fn {
+        display: inline-block;
+        background: var(--neon-fondo);
+        color: var(--neon);
+        border-radius: 6px;
+        padding: .1rem .45rem;
+        font-size: .72rem;
+        margin-right: .25rem;
+      }
+
+      /* ── La tabla se vuelve tarjetas en pantallas chicas ── */
+      @media (max-width: 767px) {
+        .tabla thead { display: none; }
+        .tabla, .tabla tbody, .tabla tr, .tabla td { display: block; width: 100%; }
+        .tabla tr {
+          border: 1px solid var(--borde-suave);
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
+          margin-bottom: 0.75rem;
+          background: var(--fondo);
+        }
+        .tabla td { border: none; padding: 0.3rem 0; }
+        .tabla td::before {
+          content: attr(data-rotulo);
+          display: block;
+          font-size: 0.68rem;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--texto-tenue);
+          margin-bottom: 0.15rem;
+        }
+        .acciones { flex-wrap: wrap; justify-content: flex-start; margin-top: 0.7rem; }
+        .tabla td.col-acciones { width: auto; white-space: normal; }
+        .celda-link { max-width: 100%; white-space: normal; word-break: break-all; }
+      }
+
+      /* ── Ventanas modales ── */
+      /* align-items:center recorta el modal por arriba cuando es más alto que
+         la pantalla, y entonces no hay forma de llegar a la cabecera ni a los
+         botones. Con flex-start + margin:auto se centra si entra, y si no
+         entra se puede desplazar. */
+      .modal-fondo {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 1.25rem 1rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        z-index: 60;
+      }
+      /* La cabecera y los botones quedan fijos; lo que se desliza es el
+         contenido. Así el botón Guardar siempre está a la vista. */
+      .modal {
+        background: var(--panel);
+        border: 1px solid var(--borde);
+        border-radius: 14px;
+        box-shadow: 0 20px 50px rgba(0,0,0,.6);
+        width: 100%;
+        max-width: 420px;
+        margin: auto;
+        max-height: calc(100vh - 2.5rem);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .modal-cabecera {
+        flex: none;
+        padding: 1.1rem 1.25rem;
+        border-bottom: 1px solid var(--borde-suave);
+        font-weight: 600;
+      }
+      .modal-cuerpo {
+        padding: 1.25rem;
+        display: grid;
+        gap: 0.85rem;
+        overflow-y: auto;
+        min-height: 0;
+      }
+      .modal-pie {
+        flex: none;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid var(--borde-suave);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.6rem;
+      }
+
+
+      /* ═══ MODAL DE ALTA DE BODA ═══
+         Es el formulario que más se usa y el que hay que entender sin que
+         nadie lo explique: por eso va más ancho, en secciones, y con las
+         funciones como tarjetas en vez de casillas sueltas. */
+      .modal-ancho { max-width: 620px; }
+
+      .cabecera-rica {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+        padding: 1.15rem 1.4rem;
+      }
+      .cabecera-rica .cab-icono {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex: none;
+        border-radius: 12px;
+        background: var(--neon-fondo);
+        color: var(--neon);
+      }
+      .cabecera-rica .cab-icono svg { width: 21px; height: 21px; }
+      .cabecera-rica strong { font-size: 1.02rem; }
+
+      .seccion { display: grid; gap: 0.85rem; }
+      .seccion + .seccion {
+        padding-top: 1.15rem;
+        border-top: 1px solid var(--borde-suave);
+      }
+      .seccion-titulo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.73rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--neon);
+      }
+      .seccion-titulo svg { width: 15px; height: 15px; flex: none; }
+
+      /* Dos campos por fila en escritorio, apilados en móvil */
+      .campo-fila { display: grid; gap: 0.85rem; }
+      @media (min-width: 620px) {
+        .campo-fila { grid-template-columns: 1fr 170px; }
+      }
+
+      .ayuda {
+        font-size: 0.78rem;
+        color: var(--texto-tenue);
+        margin-top: 0.35rem;
+        line-height: 1.45;
+      }
+      .etiqueta-auto {
+        margin-left: 0.5rem;
+        font-size: 0.68rem;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--neon);
+        background: var(--neon-fondo);
+        border-radius: 999px;
+        padding: 0.05rem 0.45rem;
+      }
+
+      /* Vista previa del link que van a recibir los invitados */
+      .vista-link {
+        background: var(--fondo);
+        border: 1px dashed var(--borde);
+        border-radius: 10px;
+        padding: 0.6rem 0.8rem;
+      }
+      .vista-link code {
+        font-size: 0.82rem;
+        color: var(--texto);
+        word-break: break-all;
+      }
+      .vista-link code b { color: var(--neon); font-weight: 600; }
+
+      /* Las funciones contratadas, como tarjetas que se pulsan */
+      .fn-grid { display: grid; gap: 0.6rem; }
+      .fn-card {
+        position: relative;
+        display: grid;
+        grid-template-columns: 30px 1fr 22px;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.65rem 0.8rem;
+        border: 1px solid var(--borde);
+        border-radius: 12px;
+        background: var(--panel-alto);
+        cursor: pointer;
+        transition: border-color .18s, background .18s;
+      }
+      .fn-card:hover { border-color: var(--neon-brillo); }
+      .fn-card input { position: absolute; opacity: 0; pointer-events: none; }
+      .fn-icono {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: rgba(125, 143, 165, 0.14);
+        color: var(--texto-tenue);
+        transition: background .18s, color .18s;
+      }
+      .fn-icono svg { width: 17px; height: 17px; }
+      .fn-texto strong {
+        display: block;
+        font-size: 0.89rem;
+        font-weight: 500;
+      }
+      .fn-tilde {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        border: 1.5px solid var(--borde);
+        display: grid;
+        place-items: center;
+        color: transparent;
+        transition: all .18s;
+      }
+      .fn-tilde svg { width: 13px; height: 13px; }
+
+      /* Encendida */
+      .fn-card:has(input:checked) {
+        border-color: var(--neon);
+        background: var(--neon-fondo);
+      }
+      .fn-card:has(input:checked) .fn-icono {
+        background: var(--neon-fondo);
+        color: var(--neon);
+      }
+      .fn-card:has(input:checked) .fn-tilde {
+        background: var(--neon);
+        border-color: var(--neon);
+        color: var(--fondo);
+      }
+      /* Foco por teclado: el navegador no lo marca solo porque la casilla
+         real está escondida */
+      .fn-card:has(input:focus-visible) { outline: 2px solid var(--neon); outline-offset: 2px; }
+
+
+      /* En pantalla ancha el formulario de alta se abre en dos columnas: los
+         datos a la izquierda, las funciones a la derecha. Sobra ancho y
+         faltaba alto, así que entra entero sin tener que desplazar. */
+      @media (min-width: 900px) {
+        .modal-ancho { max-width: 880px; }
+        .modal-ancho .modal-cuerpo {
+          grid-template-columns: 1.1fr 1fr;
+          align-items: start;
+          gap: 1.4rem 1.9rem;
+          padding: 1.4rem;
+        }
+        .modal-ancho .seccion + .seccion {
+          padding-top: 0;
+          border-top: 0;
+        }
+        .seccion-pareja    { grid-column: 1; grid-row: 1; }
+        .seccion-sitio     { grid-column: 1; grid-row: 2; }
+        /* Las funciones ocupan la columna derecha completa, y una línea las
+           separa de los datos */
+        .seccion-funciones {
+          grid-column: 2;
+          grid-row: 1 / span 2;
+          padding-left: 1.9rem;
+          border-left: 1px solid var(--borde-suave);
+        }
+        #boda-error { grid-column: 1 / -1; }
+      }
+
+      /* ── Aviso flotante ── */
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 1.5rem;
+        transform: translateX(-50%);
+        background: var(--panel-alto);
+        border: 1px solid var(--borde);
+        color: var(--texto);
+        border-radius: 999px;
+        padding: 0.6rem 1.25rem;
+        font-size: 0.88rem;
+        box-shadow: var(--sombra);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s;
+        z-index: 70;
+      }
+      .toast.visible { opacity: 1; }
+
+      /* ── Login ── */
+      .login-pantalla {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+      }
+      .login-caja { width: 100%; max-width: 370px; }
+      .login-marca { text-align: center; margin-bottom: 1.5rem; }
+      .login-marca strong { display: block; font-size: 1.15rem; }
+      .login-marca span {
+        display: block;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--texto-tenue);
+        margin-top: 0.3rem;
+      }
+      .login-rombo {
+        width: 8px; height: 8px;
+        background: var(--neon);
+        box-shadow: 0 0 14px var(--neon-brillo);
+        transform: rotate(45deg);
+        margin: 0 auto 1rem;
+      }
+
+      /* ═══ ESCRITORIO ═══ */
+      @media (min-width: 1024px) {
+        .lateral { transform: translateX(0); }
+        .principal { margin-left: 250px; }
+        .velo, #btn-menu { display: none; }
+        .contenido { padding: 1.75rem 2rem 3rem; }
+        .form-alta { grid-template-columns: 1fr 130px auto; align-items: end; }
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <!-- ═══ CARGANDO ═══ -->
+    <div id="pantalla-carga" class="login-pantalla">
+      <div style="text-align: center; max-width: 420px">
+        <p id="carga-texto" style="color: var(--texto-tenue)">Cargando…</p>
+        <div id="carga-error" class="aviso aviso-error oculto" style="text-align: left"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- LOGIN                                                    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="pantalla-login" class="login-pantalla oculto">
+      <div class="login-caja">
+        <div class="login-marca">
+          <div class="login-rombo"></div>
+          <strong>Invitaciones</strong>
+          <span>Panel de invitados</span>
+        </div>
+
+        <form id="form-login" class="tarjeta" style="padding: 1.5rem; display: grid; gap: 1rem;">
+          <div>
+            <label class="etiqueta" for="login-email">Correo</label>
+            <input id="login-email" type="email" class="campo" required autocomplete="username" />
+          </div>
+          <div>
+            <label class="etiqueta" for="login-pass">Contraseña</label>
+            <input id="login-pass" type="password" class="campo" required autocomplete="current-password" />
+          </div>
+          <p id="login-error" class="aviso aviso-error oculto"></p>
+          <button type="submit" id="btn-login" class="btn btn-neon" style="width: 100%">
+            Entrar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- PANEL                                                    -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="pantalla-panel" class="disposicion oculto">
+
+      <div id="velo" class="velo oculto"></div>
+
+      <!-- ── Barra lateral ── -->
+      <aside id="lateral" class="lateral">
+        <div class="lateral-marca">
+          <strong id="marca-boda">Invitaciones</strong>
+          <span>Panel de invitados</span>
+        </div>
+
+        <nav class="lateral-menu">
+          <button class="lateral-item activo" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Invitados
+          </button>
+        </nav>
+
+        <div class="lateral-pie">
+          <div id="sesion-email" style="word-break: break-all"></div>
+          <div id="sesion-rol" style="margin-top: .2rem; color: var(--neon)"></div>
+        </div>
+      </aside>
+
+      <!-- ── Zona principal ── -->
+      <div class="principal">
+
+        <header class="superior">
+          <button id="btn-menu" class="icono-btn" type="button" aria-label="Menú">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
+
+          <button id="btn-volver-bodas" class="btn btn-linea btn-chico oculto" type="button"
+            style="margin-right:.6rem">← Bodas</button>
+          <h1 style="margin-right: .6rem" id="titulo-boda">Invitados</h1>
+
+          <!-- Se enciende cuando el canal de tiempo real está conectado -->
+          <span id="punto-vivo" class="punto-vivo" title="Actualización en vivo">
+            <i></i><span>En vivo</span>
+          </span>
+
+          <span style="flex: 1"></span>
+
+          <button id="btn-salir" class="btn btn-linea btn-chico" type="button">
+            Salir
+          </button>
+        </header>
+
+        <main class="contenido">
+
+          <!-- Resumen -->
+          <div class="resumen">
+            <div class="caja-num">
+              <span>Invitados</span>
+              <strong id="total-invitados">0</strong>
+            </div>
+            <div class="caja-num">
+              <span>Pases</span>
+              <strong id="total-pases">0</strong>
+            </div>
+            <div class="caja-num">
+              <span>Confirmaron</span>
+              <strong id="total-confirmados">0</strong>
+            </div>
+            <div class="caja-num">
+              <span>Asistentes</span>
+              <strong id="total-asistentes">0</strong>
+            </div>
+            <div class="caja-num">
+              <span>Sin responder</span>
+              <strong id="total-pendientes">0</strong>
+            </div>
+          </div>
+
+          <!-- Aviso de registro cerrado -->
+          <p id="aviso-cerrado" class="aviso aviso-atencion oculto">
+            El registro de invitados está cerrado. Puedes consultar y compartir los links
+            existentes, pero no agregar ni modificar.
+          </p>
+
+          <!-- Alta de invitado -->
+          <section id="caja-form" class="tarjeta">
+            <div class="tarjeta-cabecera">
+              <span class="tarjeta-titulo">Nuevo invitado</span>
+            </div>
+            <div class="tarjeta-cuerpo">
+              <form id="form-invitado" class="form-alta">
+                <div>
+                  <label class="etiqueta" for="in-nombre">Nombre</label>
+                  <input
+                    id="in-nombre" type="text" class="campo" required maxlength="80"
+                    placeholder="Familia Molina Flores"
+                  />
+                </div>
+                <div id="caja-in-pases">
+                  <label class="etiqueta" for="in-pases">Pases</label>
+                  <input id="in-pases" type="number" class="campo" min="1" max="20" value="2" required />
+                </div>
+                <div id="caja-in-mesa" class="oculto">
+                  <label class="etiqueta" for="in-mesa">Mesa</label>
+                  <input id="in-mesa" type="number" class="campo" min="1" max="200" placeholder="—" />
+                </div>
+                <button type="submit" id="btn-guardar" class="btn btn-neon">Agregar</button>
+              </form>
+              <p id="form-error" class="aviso aviso-error oculto" style="margin-top: .85rem"></p>
+            </div>
+          </section>
+
+          <!-- Lista -->
+          <section class="tarjeta">
+            <div class="tarjeta-cabecera">
+              <span class="tarjeta-titulo">Lista de invitados</span>
+              <input id="buscador" type="search" class="campo" placeholder="Buscar…" style="max-width: 230px" />
+            </div>
+
+            <div style="overflow-x: auto">
+              <table class="tabla">
+                <thead>
+                  <tr>
+                    <th>Invitado</th>
+                    <th style="width: 90px" id="th-pases">Pases</th>
+                    <th style="width: 150px" id="th-confirmacion">Confirmación</th>
+                    <th style="width: 70px" id="th-mesa" class="oculto">Mesa</th>
+                    <th>Link</th>
+                    <th class="col-acciones" style="text-align: right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="lista"></tbody>
+              </table>
+            </div>
+
+            <p id="lista-vacia" class="vacio oculto">Todavía no hay invitados.</p>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 👑 PANTALLA: LISTA DE BODAS  (solo el super)            -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="pantalla-bodas" class="oculto">
+      <header class="superior">
+        <h1 style="flex: 1">Bodas</h1>
+        <span id="super-email" style="font-size:.8rem;color:var(--texto-tenue)"></span>
+        <button id="btn-salir-super" class="btn btn-linea btn-chico" type="button">Salir</button>
+      </header>
+
+      <main class="contenido">
+        <div class="resumen">
+          <div class="caja-num"><span>Clientes</span><strong id="total-bodas">0</strong></div>
+          <div class="caja-num"><span>Invitados</span><strong id="global-invitados">0</strong></div>
+          <div class="caja-num"><span>Confirmaron</span><strong id="global-confirmados">0</strong></div>
+          <div class="caja-num"><span>Asistentes</span><strong id="global-asistentes">0</strong></div>
+        </div>
+
+        <section class="tarjeta">
+          <div class="tarjeta-cabecera">
+            <span class="tarjeta-titulo">Clientes</span>
+            <div class="barra-acciones">
+              <input id="buscador-bodas" type="search" class="campo"
+                placeholder="Buscar cliente…" />
+              <button id="btn-asignar" class="btn btn-linea btn-chico" type="button">Asignar cliente</button>
+              <button id="btn-nueva-boda" class="btn btn-neon btn-chico" type="button">+ Nueva boda</button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto">
+            <table class="tabla">
+              <thead>
+                <tr>
+                  <th>Boda</th>
+                  <th style="width: 110px">Fecha</th>
+                  <th style="width: 90px">Invitados</th>
+                  <th style="width: 110px">Confirmaron</th>
+                  <th>Funciones</th>
+                  <th class="col-acciones" style="text-align: right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lista-bodas"></tbody>
+            </table>
+          </div>
+
+          <p id="bodas-vacio" class="vacio oculto">Todavía no hay bodas cargadas.</p>
+        </section>
+      </main>
+    </div>
+
+    <!-- ═══ MODAL NUEVA BODA / AJUSTES ═══ -->
+    <div id="modal-boda" class="modal-fondo oculto">
+      <div class="modal modal-ancho">
+
+        <div class="modal-cabecera cabecera-rica">
+          <span class="cab-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+              <circle cx="12" cy="15" r="6" />
+              <path d="M9 9 7.5 3h9L15 9M12 3v6" />
+            </svg>
+          </span>
+          <strong id="modal-boda-titulo">Nueva boda</strong>
+        </div>
+
+        <form id="form-boda">
+          <div class="modal-cuerpo">
+
+            <div class="seccion seccion-pareja">
+              <div class="campo-fila">
+                <div>
+                  <label class="etiqueta" for="bd-nombre">Nombre de la boda</label>
+                  <input id="bd-nombre" type="text" class="campo" required maxlength="80"
+                    placeholder="Ana Lucía &amp; Marcelo" autocomplete="off" />
+                </div>
+                <div>
+                  <label class="etiqueta" for="bd-fecha">Fecha</label>
+                  <input id="bd-fecha" type="date" class="campo" />
+                </div>
+              </div>
+
+              <div>
+                <label class="etiqueta" for="bd-slug">
+                  Identificador
+                  <span class="etiqueta-auto" id="slug-auto">automático</span>
+                </label>
+                <input id="bd-slug" type="text" class="campo" required maxlength="40"
+                  placeholder="ana-lucia-marcelo" pattern="[a-z0-9\-]+" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="seccion seccion-sitio">
+              <div>
+                <label class="etiqueta" for="bd-sitio">Dirección del sitio</label>
+                <input id="bd-sitio" type="url" class="campo"
+                  placeholder="https://boda-ana-lucia.vercel.app" autocomplete="off" />
+              </div>
+              <div class="vista-link">
+                <code id="vista-link-texto"></code>
+              </div>
+            </div>
+
+            <div class="seccion seccion-funciones">
+              <div class="seccion-titulo">Funciones</div>
+
+              <div class="fn-grid">
+                <label class="fn-card">
+                  <input type="checkbox" id="fn-pases" checked />
+                  <span class="fn-icono">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="6" width="20" height="12" rx="2" />
+                      <path d="M2 11h20M7 15h3" />
+                    </svg>
+                  </span>
+                  <span class="fn-texto"><strong>Número de pases</strong></span>
+                  <span class="fn-tilde">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                </label>
+
+                <label class="fn-card">
+                  <input type="checkbox" id="fn-confirmacion" checked />
+                  <span class="fn-icono">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                  <span class="fn-texto"><strong>Confirmación de asistencia</strong></span>
+                  <span class="fn-tilde">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                </label>
+
+                <label class="fn-card">
+                  <input type="checkbox" id="fn-mesa" />
+                  <span class="fn-icono">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <ellipse cx="12" cy="8" rx="8" ry="3.5" />
+                      <path d="M12 11.5V21M8 21h8" />
+                    </svg>
+                  </span>
+                  <span class="fn-texto"><strong>Número de mesa</strong></span>
+                  <span class="fn-tilde">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                </label>
+
+                <label class="fn-card">
+                  <input type="checkbox" id="fn-acompanantes" />
+                  <span class="fn-icono">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="3.5" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    </svg>
+                  </span>
+                  <span class="fn-texto"><strong>Nombres de acompañantes</strong></span>
+                  <span class="fn-tilde">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                </label>
+              </div>
+
+              <div class="seccion-titulo" style="margin-top: .5rem">Permisos</div>
+
+              <label class="fn-card">
+                <input type="checkbox" id="bd-registro" checked />
+                <span class="fn-icono">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+                  </svg>
+                </span>
+                <span class="fn-texto"><strong>El cliente puede agregar invitados</strong></span>
+                <span class="fn-tilde">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </span>
+              </label>
+            </div>
+
+            <p id="boda-error" class="aviso aviso-error oculto"></p>
+          </div>
+
+          <div class="modal-pie">
+            <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+            <button type="submit" class="btn btn-neon" id="btn-guardar-boda">Crear boda</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL BORRAR BODA ═══ -->
+    <div id="modal-borrar-boda" class="modal-fondo oculto">
+      <div class="modal">
+        <div class="modal-cabecera">Borrar boda</div>
+        <form id="form-borrar-boda">
+          <div class="modal-cuerpo">
+            <p class="aviso aviso-error" style="line-height:1.5">
+              Se borra <strong id="bb-nombre"></strong> y también
+              <strong id="bb-cuantos"></strong>. No se puede deshacer.
+            </p>
+            <div>
+              <label class="etiqueta" for="bb-confirmacion">
+                Escribí el nombre de la boda para confirmar
+              </label>
+              <input id="bb-confirmacion" type="text" class="campo" autocomplete="off" />
+            </div>
+            <p id="borrar-boda-error" class="aviso aviso-error oculto"></p>
+          </div>
+          <div class="modal-pie">
+            <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+            <button type="submit" class="btn btn-peligro" id="btn-borrar-boda">Borrar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL ASIGNAR CLIENTE ═══ -->
+    <div id="modal-asignar" class="modal-fondo oculto">
+      <div class="modal">
+        <div class="modal-cabecera">Asignar cliente a una boda</div>
+        <form id="form-asignar">
+          <div class="modal-cuerpo">
+            <p style="font-size:.85rem;color:var(--texto-tenue);line-height:1.5">
+              Primero creá el usuario en Supabase →
+              <strong style="color:var(--texto)">Authentication → Add user</strong>
+              (marcando <strong style="color:var(--texto)">Auto Confirm User</strong>).
+              Después pegá acá su correo para darle acceso a su boda.
+            </p>
+            <div>
+              <label class="etiqueta" for="as-correo">Correo del cliente</label>
+              <input id="as-correo" type="email" class="campo" required placeholder="novios@boda.com" />
+            </div>
+            <div>
+              <label class="etiqueta" for="as-boda">Boda</label>
+              <select id="as-boda" class="campo" required></select>
+            </div>
+            <p id="asignar-error" class="aviso aviso-error oculto"></p>
+          </div>
+          <div class="modal-pie">
+            <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+            <button type="submit" class="btn btn-neon">Asignar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL EDITAR ═══ -->
+    <div id="modal-editar" class="modal-fondo oculto">
+      <div class="modal">
+        <div class="modal-cabecera">Editar invitado</div>
+        <form id="form-editar">
+          <div class="modal-cuerpo">
+            <div>
+              <label class="etiqueta" for="ed-nombre">Nombre</label>
+              <input id="ed-nombre" type="text" class="campo" required maxlength="80" />
+            </div>
+            <div id="caja-ed-pases">
+              <label class="etiqueta" for="ed-pases">Pases</label>
+              <input id="ed-pases" type="number" class="campo" min="1" max="20" required />
+            </div>
+            <div>
+              <label class="etiqueta" for="ed-confirmado">Confirmación</label>
+              <select id="ed-confirmado" class="campo">
+                <option value="">Sin responder</option>
+                <option value="si">Asiste</option>
+                <option value="no">No asiste</option>
+              </select>
+            </div>
+            <div id="caja-ed-mesa" class="oculto">
+              <label class="etiqueta" for="ed-mesa">Mesa</label>
+              <input id="ed-mesa" type="number" class="campo" min="1" max="200" />
+            </div>
+            <div id="caja-ed-asistentes">
+              <label class="etiqueta" for="ed-asistentes">Cuántos asisten</label>
+              <input id="ed-asistentes" type="number" class="campo" min="0" max="30" />
+            </div>
+            <p style="font-size: .83rem; color: var(--texto-tenue)">
+              Sirve para cargar a mano a los que confirman por WhatsApp. Si el invitado
+              confirma desde la invitación, esto se actualiza solo.
+            </p>
+            <p style="font-size: .83rem; color: var(--texto-tenue)">
+              El link no cambia: el invitado verá los datos nuevos con el mismo enlace.
+            </p>
+            <p id="editar-error" class="aviso aviso-error oculto"></p>
+          </div>
+          <div class="modal-pie">
+            <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+            <button type="submit" class="btn btn-neon">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL BORRAR ═══ -->
+    <div id="modal-borrar" class="modal-fondo oculto">
+      <div class="modal">
+        <div class="modal-cabecera">Borrar invitado</div>
+        <div class="modal-cuerpo">
+          <p>¿Seguro que quieres borrar a <strong id="borrar-nombre"></strong>?</p>
+          <p style="font-size: .87rem; color: var(--texto-tenue)">
+            Su link dejará de funcionar. Esto no se puede deshacer.
+          </p>
+          <p id="borrar-error" class="aviso aviso-error oculto"></p>
+        </div>
+        <div class="modal-pie">
+          <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+          <button type="button" id="btn-borrar-confirmar" class="btn btn-peligro">Borrar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+      import { supabase, configurado, generarCodigo } from "../lib/supabase";
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  PANEL MULTI-CLIENTE
+      //
+      //  Dos modos, según quién entre:
+      //    super  → lista de bodas, entra a cualquiera, crea clientes
+      //    novio  → va directo a SU boda y no sabe que existen otras
+      //
+      //  ⚠️ Lo que separa a un cliente de otro son las políticas RLS de la
+      //  base, no este archivo. Acá solo se decide qué se DIBUJA; si alguien
+      //  manipula el JavaScript, Postgres igual le niega las filas ajenas.
+      // ═══════════════════════════════════════════════════════════════════
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  MODO DEMO  ·  /admin?demo=1
+      //
+      //  Dibuja el panel con datos inventados, sin tocar la base ni pedir
+      //  login. Sirve para revisar el diseño o para mostrárselo a un cliente
+      //  antes de darle acceso. No guarda nada: cualquier intento de escribir
+      //  avisa y no hace nada.
+      // ═══════════════════════════════════════════════════════════════════
+      const DEMO =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).has("demo");
+
+      const BODAS_DEMO = [
+        {
+          id: "demo-1", slug: "ana-lucia-marcelo", nombre: "Ana Lucía & Marcelo",
+          fecha: "2026-10-10", sitio_url: "https://boda-ana-lucia.vercel.app",
+          registro_abierto: true,
+          funciones: { pases: true, confirmacion: true, mesa: false, acompanantes: false },
+        },
+        {
+          id: "demo-2", slug: "marvil-carla", nombre: "Marvil & Carla",
+          fecha: "2027-01-09", sitio_url: "https://boda-marvil-carla.vercel.app",
+          registro_abierto: true,
+          funciones: { pases: true, confirmacion: true, mesa: true, acompanantes: true },
+        },
+        {
+          id: "demo-3", slug: "jorge-marianela", nombre: "Jorge & Marianela",
+          fecha: "2027-03-20", sitio_url: null, registro_abierto: false,
+          funciones: { pases: false, confirmacion: false, mesa: false, acompanantes: false },
+        },
+      ];
+
+      const INVITADOS_DEMO = {
+        "demo-1": [
+          { id: "d1", codigo: "k7m2p", nombre: "Familia Rodríguez Vargas", pases: 3, confirmado: true,  asisten: 3,    acompanantes: [], mesa: null, confirmado_en: "2026-09-01T18:20:00Z" },
+          { id: "d2", codigo: "b9nqr", nombre: "Juan Pérez",               pases: 2, confirmado: false, asisten: 0,    acompanantes: [], mesa: null, confirmado_en: "2026-09-02T09:10:00Z" },
+          { id: "d3", codigo: "w3fmt", nombre: "Familia Rojas Molina",     pases: 4, confirmado: null,  asisten: null, acompanantes: [], mesa: null, confirmado_en: null },
+          { id: "d4", codigo: "t6hvz", nombre: "Carla Mendoza",            pases: 1, confirmado: true,  asisten: 1,    acompanantes: [], mesa: null, confirmado_en: "2026-09-03T14:45:00Z" },
+        ],
+        "demo-2": [
+          { id: "d5", codigo: "q2xbd", nombre: "Familia Salazar", pases: 4, confirmado: true, asisten: 3,    acompanantes: ["Ana Salazar", "Luis Salazar"], mesa: 7,  confirmado_en: "2026-08-28T20:00:00Z" },
+          { id: "d6", codigo: "n8kct", nombre: "Roberto Ledezma", pases: 2, confirmado: null, asisten: null, acompanantes: [],                             mesa: 12, confirmado_en: null },
+        ],
+        "demo-3": [
+          { id: "d7", codigo: "f4jwp", nombre: "Familia Céspedes", pases: 5, confirmado: null, asisten: null, acompanantes: [], mesa: null, confirmado_en: null },
+        ],
+      };
+
+      function avisarDemo() {
+        avisar("Modo demo: no se guarda nada");
+      }
+
+      // ── Estado ──
+      let esSuper = false;
+      let miBodaId = null;
+
+      let bodas = [];          // solo el super las tiene
+      let bodaActual = null;   // la boda que se está mirando
+      let invitados = [];      // los invitados de bodaActual
+
+      let filtro = "";        // buscador de invitados
+      let filtroBodas = "";   // buscador de clientes
+      let enEdicion = null;
+      let enBorrado = null;
+      let bodaEnEdicion = null;
+
+      const $ = (id) => document.getElementById(id);
+      const ver = (el, visible) => el && el.classList.toggle("oculto", !visible);
+
+      // Atajo: ¿esta boda tiene contratada tal función?
+      const tiene = (fn) => Boolean(bodaActual?.funciones?.[fn]);
+
+      // ── Aviso flotante ──
+      let tiempoToast;
+      function avisar(texto) {
+        const t = $("toast");
+        t.textContent = texto;
+        t.classList.add("visible");
+        clearTimeout(tiempoToast);
+        tiempoToast = setTimeout(() => t.classList.remove("visible"), 2400);
+      }
+
+      function mostrarError(id, mensaje) {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = mensaje || "";
+        ver(el, Boolean(mensaje));
+      }
+
+      function pantalla(cual) {
+        for (const p of ["pantalla-carga", "pantalla-login", "pantalla-bodas", "pantalla-panel"]) {
+          ver($(p), p === cual);
+        }
+      }
+
+      function traducirError(error) {
+        if (error.code === "42501" || /row-level security/i.test(error.message)) {
+          return "No tienes permiso, o el registro de esta boda está cerrado.";
+        }
+        if (error.code === "23505") return "Ya existe algo con ese identificador.";
+        return error.message;
+      }
+
+      function boton(etiqueta, clase, alPulsar) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = etiqueta;
+        b.className = `btn btn-chico ${clase}`;
+        b.addEventListener("click", alPulsar);
+        return b;
+      }
+
+      // ═══ BARRA LATERAL (móvil) ═══
+      function menuLateral(abrir) {
+        $("lateral").classList.toggle("abierta", abrir);
+        ver($("velo"), abrir);
+      }
+      $("btn-menu").addEventListener("click", () => menuLateral(true));
+      $("velo").addEventListener("click", () => menuLateral(false));
+
+      // ═══ LOGIN ═══
+      $("form-login").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        mostrarError("login-error", "");
+        $("btn-login").disabled = true;
+
+        const { error } = await supabase.auth.signInWithPassword({
+          email: $("login-email").value.trim(),
+          password: $("login-pass").value,
+        });
+
+        $("btn-login").disabled = false;
+
+        if (error) {
+          mostrarError(
+            "login-error",
+            error.message === "Invalid login credentials"
+              ? "Correo o contraseña incorrectos."
+              : error.message
+          );
+          return;
+        }
+        await entrar();
+      });
+
+      async function salir() {
+        soltarCanal();
+        await supabase.auth.signOut();
+        location.reload();
+      }
+      $("btn-salir").addEventListener("click", salir);
+      $("btn-salir-super").addEventListener("click", salir);
+
+      // ═══ ENTRADA ═══
+      async function entrar() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          pantalla("pantalla-login");
+          return;
+        }
+
+        const { data: perfil } = await supabase
+          .from("perfiles").select("rol, boda_id").eq("id", session.user.id).maybeSingle();
+
+        esSuper = perfil?.rol === "super";
+        miBodaId = perfil?.boda_id ?? null;
+
+        $("sesion-email").textContent = session.user.email;
+        $("super-email").textContent = session.user.email;
+        $("sesion-rol").textContent = esSuper ? "Administrador" : "Novios";
+        ver($("btn-volver-bodas"), esSuper);
+
+        if (esSuper) {
+          await cargarBodas();
+          pantalla("pantalla-bodas");
+          return;
+        }
+
+        // Un cliente sin boda asignada todavía: mejor decirlo que dejarlo
+        // mirando una pantalla vacía sin entender por qué.
+        if (!miBodaId) {
+          pantalla("pantalla-carga");
+          fallo(
+            "Tu cuenta todavía no tiene una boda asignada",
+            "Avisale al administrador para que te dé acceso."
+          );
+          return;
+        }
+
+        await abrirBoda(miBodaId);
+      }
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  MODO SUPER: LA LISTA DE BODAS
+      // ═══════════════════════════════════════════════════════════════════
+
+      async function cargarBodas() {
+        if (DEMO) { cargarBodasDemo(); return; }
+
+        // Dos consultas y se cruzan acá. A esta escala (decenas de bodas,
+        // miles de filas) sale más barato que pedirle agregados a la base.
+        const [resBodas, resInv] = await Promise.all([
+          supabase.from("bodas")
+            .select("id, slug, nombre, fecha, sitio_url, registro_abierto, funciones, activa")
+            .order("fecha", { ascending: true }),
+          supabase.from("invitados").select("boda_id, pases, confirmado, asisten"),
+        ]);
+
+        if (resBodas.error) {
+          avisar("No se pudo cargar la lista de bodas");
+          return;
+        }
+
+        bodas = resBodas.data ?? [];
+        const filas = resInv.data ?? [];
+
+        for (const b of bodas) {
+          const suyos = filas.filter((i) => i.boda_id === b.id);
+          b.total = suyos.length;
+          b.confirmados = suyos.filter((i) => i.confirmado === true).length;
+          b.asistentes = suyos.reduce(
+            (s, i) => s + (i.confirmado === true ? i.asisten || 0 : 0), 0
+          );
+        }
+
+        $("total-bodas").textContent = String(bodas.length);
+        $("global-invitados").textContent = String(filas.length);
+        $("global-confirmados").textContent =
+          String(filas.filter((i) => i.confirmado === true).length);
+        $("global-asistentes").textContent = String(
+          filas.reduce((s, i) => s + (i.confirmado === true ? i.asisten || 0 : 0), 0)
+        );
+
+        pintarBodas();
+      }
+
+      const NOMBRES_FN = {
+        pases: "Pases",
+        confirmacion: "Confirmación",
+        mesa: "Mesa",
+        acompanantes: "Acompañantes",
+      };
+
+      function pintarBodas() {
+        const cuerpo = $("lista-bodas");
+        cuerpo.innerHTML = "";
+
+        // Con muchas bodas hace falta buscar. Se filtra por nombre y también
+        // por identificador, que es como aparecen en la base.
+        const texto = filtroBodas.trim().toLowerCase();
+        const visibles = texto
+          ? bodas.filter(
+              (b) =>
+                b.nombre.toLowerCase().includes(texto) ||
+                (b.slug ?? "").toLowerCase().includes(texto)
+            )
+          : bodas;
+
+        const vacio = $("bodas-vacio");
+        vacio.textContent = bodas.length
+          ? "Ningún cliente coincide con “" + filtroBodas.trim() + "”."
+          : "Todavía no hay bodas cargadas.";
+        ver(vacio, visibles.length === 0);
+
+        for (const b of visibles) {
+          const fila = document.createElement("tr");
+
+          const tdNombre = document.createElement("td");
+          tdNombre.dataset.rotulo = "Boda";
+          tdNombre.className = "celda-nombre";
+          tdNombre.textContent = b.nombre;
+          if (!b.registro_abierto) {
+            const cerrado = document.createElement("span");
+            cerrado.className = "marca-conf marca-pendiente";
+            cerrado.style.marginLeft = ".5rem";
+            cerrado.textContent = "cerrada";
+            tdNombre.append(cerrado);
+          }
+
+          const tdFecha = document.createElement("td");
+          tdFecha.dataset.rotulo = "Fecha";
+          tdFecha.textContent = b.fecha
+            ? new Date(b.fecha + "T12:00:00").toLocaleDateString("es-BO")
+            : "—";
+
+          const tdTotal = document.createElement("td");
+          tdTotal.dataset.rotulo = "Invitados";
+          const p1 = document.createElement("span");
+          p1.className = "pastilla";
+          p1.textContent = String(b.total);
+          tdTotal.append(p1);
+
+          const tdConf = document.createElement("td");
+          tdConf.dataset.rotulo = "Confirmaron";
+          tdConf.textContent = b.confirmados + " · " + b.asistentes + " personas";
+
+          const tdFn = document.createElement("td");
+          tdFn.dataset.rotulo = "Funciones";
+          const activas = Object.keys(NOMBRES_FN).filter((k) => b.funciones?.[k]);
+          if (!activas.length) {
+            tdFn.textContent = "—";
+          } else {
+            for (const k of activas) {
+              const e = document.createElement("span");
+              e.className = "etiqueta-fn";
+              e.textContent = NOMBRES_FN[k];
+              tdFn.append(e);
+            }
+          }
+
+          const tdAcciones = document.createElement("td");
+          tdAcciones.className = "col-acciones";
+          const acciones = document.createElement("div");
+          acciones.className = "acciones";
+          acciones.append(
+            boton("Entrar", "btn-neon", () => abrirBoda(b.id)),
+            boton("Ajustes", "btn-linea", () => abrirModalBoda(b)),
+            boton("Borrar", "btn-peligro", () => abrirBorrarBoda(b))
+          );
+          tdAcciones.append(acciones);
+
+          fila.append(tdNombre, tdFecha, tdTotal, tdConf, tdFn, tdAcciones);
+          cuerpo.append(fila);
+        }
+      }
+
+      // ── Alta / ajustes de una boda ──
+      $("btn-nueva-boda").addEventListener("click", () => abrirModalBoda(null));
+
+      $("btn-volver-bodas").addEventListener("click", async () => {
+        soltarCanal();
+        await cargarBodas();
+        pantalla("pantalla-bodas");
+      });
+
+      /**
+       * "Ana Lucía & Marcelo" → "ana-lucia-marcelo"
+       * Se quitan los acentos y todo lo que no sea letra o número, para que
+       * el identificador sea siempre válido sin que nadie tenga que pensarlo.
+       */
+      function comoIdentificador(texto) {
+        return texto
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 40);
+      }
+
+      // Mientras el identificador no se toque a mano, sigue al nombre. En
+      // cuanto alguien lo edita, se respeta lo que escribió.
+      let slugAMano = false;
+
+      $("bd-nombre").addEventListener("input", () => {
+        if (slugAMano || bodaEnEdicion) return;
+        $("bd-slug").value = comoIdentificador($("bd-nombre").value);
+      });
+
+      $("bd-slug").addEventListener("input", () => {
+        slugAMano = $("bd-slug").value.trim() !== "";
+        ver($("slug-auto"), !slugAMano);
+      });
+
+      // Vista previa del link: se entiende de una qué hace ese campo
+      function pintarVistaLink() {
+        const base = $("bd-sitio").value.trim().replace(/\/+$/, "");
+        const dominio = base || "https://tu-invitacion.vercel.app";
+        $("vista-link-texto").innerHTML =
+          dominio.replace(/[<>&]/g, "") + "/?i=<b>k7m2p</b>";
+      }
+      $("bd-sitio").addEventListener("input", pintarVistaLink);
+
+      function abrirModalBoda(b) {
+        bodaEnEdicion = b;
+        const editando = Boolean(b);
+
+        $("modal-boda-titulo").textContent = editando ? "Ajustes de la boda" : "Nueva boda";
+        $("btn-guardar-boda").textContent = editando ? "Guardar cambios" : "Crear boda";
+
+        $("bd-nombre").value = b?.nombre ?? "";
+        $("bd-slug").value = b?.slug ?? "";
+        // Se puede corregir: nada depende de él (los links usan el código
+        // del invitado, no esto), y un error de tipeo no debería obligar a
+        // borrar la boda y rehacerla.
+        $("bd-slug").disabled = false;
+        $("bd-fecha").value = b?.fecha ?? "";
+        $("bd-sitio").value = b?.sitio_url ?? "";
+        // Pases y confirmación vienen prendidos: es lo que quiere casi todo
+        // el mundo. Los otros dos se piden aparte.
+        $("fn-pases").checked = editando ? b.funciones?.pases !== false : true;
+        $("fn-confirmacion").checked = editando ? Boolean(b.funciones?.confirmacion) : true;
+        $("fn-mesa").checked = Boolean(b?.funciones?.mesa);
+        $("fn-acompanantes").checked = Boolean(b?.funciones?.acompanantes);
+        $("bd-registro").checked = editando ? Boolean(b.registro_abierto) : true;
+
+        slugAMano = editando;
+        ver($("slug-auto"), !editando);
+        pintarVistaLink();
+
+        mostrarError("boda-error", "");
+        ver($("modal-boda"), true);
+        $("bd-nombre").focus();
+      }
+
+      $("form-boda").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (DEMO) { cerrarModales(); avisarDemo(); return; }
+        mostrarError("boda-error", "");
+
+        const datos = {
+          nombre: $("bd-nombre").value.trim(),
+          fecha: $("bd-fecha").value || null,
+          sitio_url: $("bd-sitio").value.trim() || null,
+          registro_abierto: $("bd-registro").checked,
+          funciones: {
+            pases: $("fn-pases").checked,
+            confirmacion: $("fn-confirmacion").checked,
+            mesa: $("fn-mesa").checked,
+            acompanantes: $("fn-acompanantes").checked,
+          },
+        };
+
+        if (!datos.nombre) return;
+
+        const slug = $("bd-slug").value.trim().toLowerCase();
+        if (!/^[a-z0-9-]+$/.test(slug)) {
+          mostrarError("boda-error", "El identificador solo admite minúsculas, números y guiones.");
+          return;
+        }
+
+        let error;
+        if (bodaEnEdicion) {
+          ({ error } = await supabase
+            .from("bodas").update({ ...datos, slug }).eq("id", bodaEnEdicion.id));
+        } else {
+          ({ error } = await supabase.from("bodas").insert({ ...datos, slug }));
+        }
+
+        if (error) {
+          mostrarError("boda-error", traducirError(error));
+          return;
+        }
+
+        const eraNueva = !bodaEnEdicion;
+        cerrarModales();
+        await cargarBodas();
+        avisar(eraNueva ? "Boda creada" : "Boda actualizada");
+      });
+
+      // ── Borrar una boda ──
+      let bodaEnBorrado = null;
+
+      function abrirBorrarBoda(b) {
+        bodaEnBorrado = b;
+        $("bb-nombre").textContent = b.nombre;
+        $("bb-cuantos").textContent =
+          b.total === 1 ? "su único invitado" : "sus " + b.total + " invitados";
+        $("bb-confirmacion").value = "";
+        mostrarError("borrar-boda-error", "");
+        ver($("modal-borrar-boda"), true);
+        $("bb-confirmacion").focus();
+      }
+
+      $("form-borrar-boda").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (DEMO) { cerrarModales(); avisarDemo(); return; }
+        if (!bodaEnBorrado) return;
+
+        if ($("bb-confirmacion").value.trim() !== bodaEnBorrado.nombre) {
+          mostrarError("borrar-boda-error", "El nombre no coincide.");
+          return;
+        }
+
+        const { error } = await supabase.from("bodas").delete().eq("id", bodaEnBorrado.id);
+        if (error) {
+          mostrarError("borrar-boda-error", traducirError(error));
+          return;
+        }
+
+        cerrarModales();
+        await cargarBodas();
+        avisar("Boda borrada");
+      });
+
+      // ── Asignar un cliente a su boda ──
+      $("btn-asignar").addEventListener("click", () => {
+        const sel = $("as-boda");
+        sel.innerHTML = "";
+        for (const b of bodas) {
+          const o = document.createElement("option");
+          o.value = b.id;
+          o.textContent = b.nombre;
+          sel.append(o);
+        }
+        $("as-correo").value = "";
+        mostrarError("asignar-error", "");
+        ver($("modal-asignar"), true);
+        $("as-correo").focus();
+      });
+
+      $("form-asignar").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (DEMO) { cerrarModales(); avisarDemo(); return; }
+        mostrarError("asignar-error", "");
+
+        const { data, error } = await supabase.rpc("asignar_cliente", {
+          correo: $("as-correo").value.trim(),
+          la_boda: $("as-boda").value,
+        });
+
+        if (error) {
+          mostrarError("asignar-error", traducirError(error));
+          return;
+        }
+        // La función devuelve un texto: puede ser un "listo" o un "no existe"
+        if (typeof data === "string" && /^No existe/.test(data)) {
+          mostrarError("asignar-error", data);
+          return;
+        }
+
+        cerrarModales();
+        avisar("Cliente asignado");
+      });
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  MODO BODA: EL PANEL DE INVITADOS
+      // ═══════════════════════════════════════════════════════════════════
+
+      async function abrirBoda(id) {
+        soltarCanal();
+
+        if (DEMO) {
+          bodaActual = BODAS_DEMO.find((b) => b.id === id) ?? BODAS_DEMO[0];
+          $("titulo-boda").textContent = bodaActual.nombre;
+          $("marca-boda").textContent = bodaActual.nombre;
+          aplicarFunciones();
+          aplicarPermisos();
+          pantalla("pantalla-panel");
+          menuLateral(false);
+          invitados = (INVITADOS_DEMO[bodaActual.id] ?? []).map((x) => ({ ...x }));
+          pintarLista();
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("bodas")
+          .select("id, slug, nombre, fecha, sitio_url, registro_abierto, funciones")
+          .eq("id", id)
+          .maybeSingle();
+
+        if (error || !data) {
+          avisar("No se pudo abrir esa boda");
+          return;
+        }
+
+        bodaActual = data;
+        $("titulo-boda").textContent = data.nombre;
+        $("marca-boda").textContent = data.nombre;
+
+        aplicarFunciones();
+        aplicarPermisos();
+        pantalla("pantalla-panel");
+        menuLateral(false);
+        await cargarInvitados();
+      }
+
+      // Muestra u oculta columnas y campos según lo que la boda tenga
+      // contratado. Un solo código para todos los clientes.
+      function aplicarFunciones() {
+        const conf = tiene("confirmacion");
+        // Los pases vienen prendidos salvo que se apaguen a propósito: las
+        // bodas viejas no tienen la clave y deben seguir mostrándolos.
+        const pases = bodaActual?.funciones?.pases !== false;
+
+        ver($("th-pases"), pases);
+        ver($("caja-in-pases"), pases);
+        ver($("caja-ed-pases"), pases);
+        ver($("total-pases").parentElement, pases);
+
+        ver($("th-confirmacion"), conf);
+        ver($("th-mesa"), tiene("mesa"));
+        ver($("caja-in-mesa"), tiene("mesa"));
+        ver($("caja-ed-mesa"), tiene("mesa"));
+        ver($("ed-confirmado").parentElement, conf);
+        ver($("total-confirmados").parentElement, conf);
+        ver($("total-asistentes").parentElement, conf);
+        ver($("total-pendientes").parentElement, conf);
+      }
+
+      // El super siempre puede; el cliente solo con su registro abierto
+      const puedeEditar = () => esSuper || Boolean(bodaActual?.registro_abierto);
+
+      function aplicarPermisos() {
+        const permitido = puedeEditar();
+        ver($("caja-form"), permitido);
+        ver($("aviso-cerrado"), !permitido);
+      }
+
+      // ═══ TIEMPO REAL ═══
+      // La lista se mantiene al día sin que nadie apriete F5: entra un
+      // invitado desde otra pestaña, o alguien confirma desde su celular, y
+      // la fila aparece o cambia sola.
+      //
+      // El filtro por boda_id evita recibir eventos de otras bodas. Aunque
+      // llegaran, el RLS ya los habría bloqueado: esto es para no gastar red.
+      let canal = null;
+      let recienCambiados = new Set();
+
+      function soltarCanal() {
+        if (canal) {
+          supabase.removeChannel(canal);
+          canal = null;
+        }
+        $("punto-vivo")?.classList.remove("vivo");
+      }
+
+      function escucharCambios() {
+        soltarCanal();
+        if (!bodaActual) return;
+
+        canal = supabase
+          .channel("panel-" + bodaActual.id)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "invitados",
+              filter: "boda_id=eq." + bodaActual.id,
+            },
+            (evento) => {
+              if (evento.eventType === "INSERT") {
+                if (invitados.some((i) => i.id === evento.new.id)) return;
+                invitados.unshift(evento.new);
+                recienCambiados.add(evento.new.id);
+              } else if (evento.eventType === "UPDATE") {
+                const i = invitados.findIndex((x) => x.id === evento.new.id);
+                if (i === -1) return;
+                invitados[i] = { ...invitados[i], ...evento.new };
+                recienCambiados.add(evento.new.id);
+              } else if (evento.eventType === "DELETE") {
+                invitados = invitados.filter((x) => x.id !== evento.old.id);
+              }
+              pintarLista();
+            }
+          )
+          .subscribe((estado) => {
+            $("punto-vivo")?.classList.toggle("vivo", estado === "SUBSCRIBED");
+          });
+      }
+
+      // ═══ DATOS ═══
+      const COLUMNAS =
+        "id, codigo, nombre, pases, confirmado, asisten, acompanantes, mesa, confirmado_en";
+
+      async function cargarInvitados() {
+        const { data, error } = await supabase
+          .from("invitados")
+          .select(COLUMNAS)
+          .eq("boda_id", bodaActual.id)
+          .order("creado_en", { ascending: false });
+
+        if (error) {
+          avisar("No se pudo cargar la lista");
+          return;
+        }
+        invitados = data ?? [];
+        pintarLista();
+        escucharCambios();
+      }
+
+      // ── Alta de invitado ──
+      $("form-invitado").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (DEMO) { avisarDemo(); return; }
+        mostrarError("form-error", "");
+
+        const nombre = $("in-nombre").value.trim();
+        const pases = Number($("in-pases").value);
+
+        if (!nombre) return;
+        if (!Number.isInteger(pases) || pases < 1 || pases > 30) {
+          mostrarError("form-error", "Los pases deben ser un número del 1 al 30.");
+          return;
+        }
+
+        const base = {
+          nombre,
+          pases: bodaActual?.funciones?.pases === false ? 1 : pases,
+          boda_id: bodaActual.id,
+        };
+        if (tiene("mesa")) base.mesa = Number($("in-mesa").value) || null;
+
+        $("btn-guardar").disabled = true;
+
+        // El código es aleatorio y único entre TODAS las bodas: si choca con
+        // uno existente, se reintenta.
+        let guardado = null;
+        for (let intento = 0; intento < 5; intento++) {
+          const { data, error } = await supabase
+            .from("invitados")
+            .insert({ codigo: generarCodigo(), ...base })
+            .select(COLUMNAS)
+            .single();
+
+          if (!error) { guardado = data; break; }
+          if (error.code !== "23505") {      // 23505 = código repetido
+            mostrarError("form-error", traducirError(error));
+            break;
+          }
+        }
+
+        $("btn-guardar").disabled = false;
+        if (!guardado) return;
+
+        if (!invitados.some((i) => i.id === guardado.id)) invitados.unshift(guardado);
+        $("in-nombre").value = "";
+        $("in-pases").value = "2";
+        if (tiene("mesa")) $("in-mesa").value = "";
+        $("in-nombre").focus();
+        pintarLista();
+        avisar("Invitado agregado");
+      });
+
+      // ── Modales ──
+      for (const btn of document.querySelectorAll("[data-cerrar-modal]")) {
+        btn.addEventListener("click", cerrarModales);
+      }
+      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda"]) {
+        $(id).addEventListener("click", (e) => {
+          if (e.target === $(id)) cerrarModales();
+        });
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") cerrarModales();
+      });
+
+      function cerrarModales() {
+        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda"]) {
+          ver($(id), false);
+        }
+        for (const id of ["editar-error", "borrar-error", "boda-error", "asignar-error", "borrar-boda-error"]) {
+          mostrarError(id, "");
+        }
+        enEdicion = null;
+        enBorrado = null;
+        bodaEnEdicion = null;
+        bodaEnBorrado = null;
+      }
+
+      function abrirEditar(inv) {
+        enEdicion = inv;
+        $("ed-nombre").value = inv.nombre;
+        $("ed-pases").value = String(inv.pases);
+        $("ed-mesa").value = inv.mesa ?? "";
+        $("ed-confirmado").value =
+          inv.confirmado === true ? "si" : inv.confirmado === false ? "no" : "";
+        $("ed-asistentes").value = String(inv.asisten ?? 0);
+        sincronizarAsistentes();
+        mostrarError("editar-error", "");
+        ver($("modal-editar"), true);
+        $("ed-nombre").focus();
+      }
+
+      // El campo "cuántos asisten" solo tiene sentido si dijo que sí.
+      function sincronizarAsistentes() {
+        const asiste = tiene("confirmacion") && $("ed-confirmado").value === "si";
+        ver($("caja-ed-asistentes"), asiste);
+        if (asiste && Number($("ed-asistentes").value) < 1) {
+          $("ed-asistentes").value = String(enEdicion?.pases ?? 1);
+        }
+      }
+      $("ed-confirmado").addEventListener("change", sincronizarAsistentes);
+
+      $("form-editar").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (DEMO) { cerrarModales(); avisarDemo(); return; }
+        if (!enEdicion) return;
+
+        const nombre = $("ed-nombre").value.trim();
+        const pases = Number($("ed-pases").value);
+
+        if (!nombre || !Number.isInteger(pases) || pases < 1 || pases > 30) {
+          mostrarError("editar-error", "Revisa el nombre y que los pases estén entre 1 y 30.");
+          return;
+        }
+
+        const parche = { nombre, pases };
+        if (tiene("mesa")) parche.mesa = Number($("ed-mesa").value) || null;
+
+        if (tiene("confirmacion")) {
+          const respuesta = $("ed-confirmado").value;
+          const confirmado = respuesta === "si" ? true : respuesta === "no" ? false : null;
+          parche.confirmado = confirmado;
+          parche.asisten =
+            confirmado === true
+              ? Math.min(Math.max(Number($("ed-asistentes").value) || 0, 1), pases)
+              : 0;
+          // Si la respuesta cambió se sella la fecha; si no, se deja la que había
+          const cambio = confirmado !== (enEdicion.confirmado ?? null);
+          parche.confirmado_en =
+            confirmado === null ? null : cambio ? new Date().toISOString() : enEdicion.confirmado_en;
+        }
+
+        const { error } = await supabase
+          .from("invitados").update(parche).eq("id", enEdicion.id);
+
+        if (error) {
+          mostrarError("editar-error", traducirError(error));
+          return;
+        }
+
+        Object.assign(enEdicion, parche);
+        cerrarModales();
+        pintarLista();
+        avisar("Actualizado — el link sigue sirviendo");
+      });
+
+      function abrirBorrar(inv) {
+        enBorrado = inv;
+        $("borrar-nombre").textContent = inv.nombre;
+        mostrarError("borrar-error", "");
+        ver($("modal-borrar"), true);
+      }
+
+      $("btn-borrar-confirmar").addEventListener("click", async () => {
+        if (DEMO) { cerrarModales(); avisarDemo(); return; }
+        if (!enBorrado) return;
+
+        const { error } = await supabase.from("invitados").delete().eq("id", enBorrado.id);
+        if (error) {
+          mostrarError("borrar-error", traducirError(error));
+          return;
+        }
+
+        invitados = invitados.filter((x) => x.id !== enBorrado.id);
+        cerrarModales();
+        pintarLista();
+        avisar("Invitado borrado");
+      });
+
+      // ── Compartir ──
+      // El link se arma con el dominio de ESA boda, no con el de la pestaña:
+      // desde tu panel podés estar mirando la boda de otro cliente.
+      function linkDeInvitado(codigo) {
+        const base = (bodaActual?.sitio_url || window.location.origin).replace(/\/+$/, "");
+        return `${base}/?i=${codigo}`;
+      }
+
+      async function copiar(texto, aviso = "Mensaje copiado") {
+        try {
+          await navigator.clipboard.writeText(texto);
+        } catch {
+          // Safari y contextos sin permiso de portapapeles
+          const campo = document.createElement("textarea");
+          campo.value = texto;
+          campo.style.position = "fixed";
+          campo.style.opacity = "0";
+          document.body.appendChild(campo);
+          campo.select();
+          document.execCommand("copy");
+          campo.remove();
+        }
+        avisar(aviso);
+      }
+
+      // Los *asteriscos* son la negrita de WhatsApp.
+      function mensajeInvitacion(inv) {
+        return [
+          "*Con el corazón lleno de amor*",
+          "",
+          "Hemos decidido unir nuestras vidas y dar el paso más importante de nuestra historia.",
+          "Queremos compartir este momento tan especial con las personas que más queremos.",
+          "",
+          "Será un honor contar con tu presencia en nuestro gran día. 🤍",
+          "",
+          "*Haz clic en el enlace para ver nuestra invitación*",
+          "",
+          linkDeInvitado(inv.codigo),
+          "",
+          "¡Te esperamos para celebrar juntos este hermoso comienzo!",
+        ].join("\n");
+      }
+
+      // ═══ PINTAR LA LISTA DE INVITADOS ═══
+      function pintarLista() {
+        const cuerpo = $("lista");
+        cuerpo.innerHTML = "";
+
+        const texto = filtro.trim().toLowerCase();
+        const visibles = texto
+          ? invitados.filter((i) => i.nombre.toLowerCase().includes(texto))
+          : invitados;
+
+        $("total-invitados").textContent = String(invitados.length);
+        $("total-pases").textContent = String(invitados.reduce((s, i) => s + i.pases, 0));
+        $("total-confirmados").textContent = String(
+          invitados.filter((i) => i.confirmado === true).length
+        );
+        $("total-asistentes").textContent = String(
+          invitados.reduce((s, i) => s + (i.confirmado === true ? i.asisten || 0 : 0), 0)
+        );
+        $("total-pendientes").textContent = String(
+          invitados.filter((i) => i.confirmado === null || i.confirmado === undefined).length
+        );
+        ver($("lista-vacia"), visibles.length === 0);
+
+        const permitido = puedeEditar();
+
+        for (const inv of visibles) {
+          const link = linkDeInvitado(inv.codigo);
+          const fila = document.createElement("tr");
+
+          const tdNombre = document.createElement("td");
+          tdNombre.dataset.rotulo = "Invitado";
+          tdNombre.className = "celda-nombre";
+          tdNombre.textContent = inv.nombre;
+          if (tiene("acompanantes") && inv.acompanantes?.length) {
+            const con = document.createElement("div");
+            con.style.cssText = "font-size:.78rem;color:var(--texto-tenue);margin-top:.2rem";
+            con.textContent = "con " + inv.acompanantes.join(", ");
+            tdNombre.append(con);
+          }
+
+          const celdas = [tdNombre];
+
+          if (bodaActual?.funciones?.pases !== false) {
+            const tdPases = document.createElement("td");
+            tdPases.dataset.rotulo = "Pases";
+            const pastilla = document.createElement("span");
+            pastilla.className = "pastilla";
+            pastilla.textContent = String(inv.pases);
+            tdPases.append(pastilla);
+            celdas.push(tdPases);
+          }
+
+          if (tiene("confirmacion")) {
+            const tdConfirm = document.createElement("td");
+            tdConfirm.dataset.rotulo = "Confirmación";
+            const marca = document.createElement("span");
+            marca.className = "marca-conf " + (
+              inv.confirmado === true ? "marca-si"
+              : inv.confirmado === false ? "marca-no"
+              : "marca-pendiente"
+            );
+            marca.textContent =
+              inv.confirmado === true ? "Asiste · " + (inv.asisten || 0)
+              : inv.confirmado === false ? "No asiste"
+              : "Sin responder";
+            if (inv.confirmado_en) {
+              marca.title = "Respondió el " + new Date(inv.confirmado_en).toLocaleString("es-BO");
+            }
+            tdConfirm.append(marca);
+            celdas.push(tdConfirm);
+          }
+
+          if (tiene("mesa")) {
+            const tdMesa = document.createElement("td");
+            tdMesa.dataset.rotulo = "Mesa";
+            tdMesa.textContent = inv.mesa ? String(inv.mesa) : "—";
+            celdas.push(tdMesa);
+          }
+
+          const tdLink = document.createElement("td");
+          tdLink.dataset.rotulo = "Link";
+          tdLink.className = "celda-link";
+          tdLink.textContent = link;
+          celdas.push(tdLink);
+
+          const tdAcciones = document.createElement("td");
+          tdAcciones.className = "col-acciones";
+          const acciones = document.createElement("div");
+          acciones.className = "acciones";
+
+          acciones.append(
+            boton("Copiar mensaje", "btn-neon", () => copiar(mensajeInvitacion(inv))),
+            boton("Solo link", "btn-linea", () => copiar(link, "Link copiado"))
+          );
+
+          if (permitido) {
+            acciones.append(
+              boton("Editar", "btn-linea", () => abrirEditar(inv)),
+              boton("Borrar", "btn-peligro", () => abrirBorrar(inv))
+            );
+          }
+
+          tdAcciones.append(acciones);
+          celdas.push(tdAcciones);
+
+          if (recienCambiados.has(inv.id)) {
+            fila.classList.add("fila-nueva");
+            recienCambiados.delete(inv.id);
+          }
+
+          fila.append(...celdas);
+          cuerpo.append(fila);
+        }
+      }
+
+      $("buscador").addEventListener("input", (e) => {
+        filtro = e.target.value;
+        pintarLista();
+      });
+
+      $("buscador-bodas").addEventListener("input", (e) => {
+        filtroBodas = e.target.value;
+        pintarBodas();
+      });
+
+      // ── Modo demo: los mismos cálculos, con datos inventados ──
+      function cargarBodasDemo() {
+        bodas = BODAS_DEMO.map((b) => {
+          const suyos = INVITADOS_DEMO[b.id] ?? [];
+          return {
+            ...b,
+            total: suyos.length,
+            confirmados: suyos.filter((i) => i.confirmado === true).length,
+            asistentes: suyos.reduce((s, i) => s + (i.confirmado === true ? i.asisten || 0 : 0), 0),
+          };
+        });
+
+        const todos = Object.values(INVITADOS_DEMO).flat();
+        $("total-bodas").textContent = String(bodas.length);
+        $("global-invitados").textContent = String(todos.length);
+        $("global-confirmados").textContent =
+          String(todos.filter((i) => i.confirmado === true).length);
+        $("global-asistentes").textContent = String(
+          todos.reduce((s, i) => s + (i.confirmado === true ? i.asisten || 0 : 0), 0)
+        );
+
+        pintarBodas();
+      }
+
+      function arrancarDemo() {
+        esSuper = true;
+        $("sesion-email").textContent = "demo@ejemplo.com";
+        $("super-email").textContent = "MODO DEMO";
+        $("sesion-rol").textContent = "Administrador";
+        ver($("btn-volver-bodas"), true);
+        cargarBodasDemo();
+        pantalla("pantalla-bodas");
+        avisar("Modo demo: datos de ejemplo, no se guarda nada");
+      }
+
+      // ═══ ARRANQUE ═══
+      function fallo(titulo, detalle) {
+        $("carga-texto").classList.add("oculto");
+        const caja = $("carga-error");
+        caja.innerHTML =
+          "<strong>" + titulo + "</strong><br><span style='opacity:.85'>" + detalle + "</span>";
+        caja.classList.remove("oculto");
+      }
+
+      // Cualquier error suelto se muestra en pantalla. Sin esto, un fallo deja
+      // el panel colgado en "Cargando…" sin decir qué pasó, y desde afuera
+      // parece que el sitio está roto.
+      window.addEventListener("error", (e) => {
+        if ($("pantalla-carga").classList.contains("oculto")) return;
+        fallo("Error al iniciar el panel", String(e.message || e));
+      });
+
+      /**
+       * Si la base no contesta en unos segundos se sigue igual, en vez de
+       * esperar para siempre. Pasa con un proyecto de Supabase pausado o mal
+       * configurado: la petición se queda colgada sin fallar nunca.
+       */
+      function conLimite(promesa, ms = 8000) {
+        return Promise.race([
+          promesa,
+          new Promise((_, rechazar) =>
+            setTimeout(() => rechazar(new Error("La base de datos no respondió a tiempo")), ms)
+          ),
+        ]);
+      }
+
+      (async () => {
+        // El modo demo no toca la base: se dibuja y listo.
+        if (DEMO) {
+          try {
+            arrancarDemo();
+          } catch (e) {
+            fallo("Error en el modo demo", String(e?.message || e));
+          }
+          return;
+        }
+
+        // Sin variables de entorno no hay nada que hacer: avisar en vez de
+        // dejar la pantalla colgada en "Cargando…"
+        if (!configurado) {
+          fallo(
+            "Falta la configuración de Supabase",
+            "Las variables PUBLIC_SUPABASE_URL y PUBLIC_SUPABASE_KEY no llegaron al build. " +
+            "Agrégalas en Vercel → Settings → Environment Variables y vuelve a desplegar " +
+            "(Deployments → ⋯ → Redeploy)."
+          );
+          return;
+        }
+
+        try {
+          const { data } = await conLimite(supabase.auth.getSession());
+          if (data?.session) await entrar();
+          else pantalla("pantalla-login");
+        } catch (e) {
+          fallo(
+            "No se pudo conectar con la base de datos",
+            String(e?.message || e) +
+              ". Revisá que PUBLIC_SUPABASE_URL apunte a un proyecto que exista y no esté pausado."
+          );
+        }
+      })();
+    </script>
+  </body>
+</html>
