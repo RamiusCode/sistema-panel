@@ -9,3 +9,6 @@ npm-debug.log*
 
 .DS_Store
 .idea/
+
+# Servidor local de pruebas: no hace falta en el sitio publicado
+servir.cjs
