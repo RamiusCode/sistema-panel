@@ -3019,8 +3019,6 @@
           celdaTotal.alignment = { vertical: "middle", horizontal: "center" };
           celdaTotal.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
 
-          hoja.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: ultima } };
-
           // ── Descargar ──
           const datos = await libro.xlsx.writeBuffer();
           const enlace = document.createElement("a");
