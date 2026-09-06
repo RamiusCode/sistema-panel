@@ -1258,6 +1258,21 @@
                 </label>
 
                 <label class="fn-card">
+                  <input type="checkbox" id="fn-cantidad" />
+                  <span class="fn-icono">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14M12 5v14" />
+                    </svg>
+                  </span>
+                  <span class="fn-texto"><strong>Elegir cuántos vienen</strong></span>
+                  <span class="fn-tilde">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
+                </label>
+
+                <label class="fn-card">
                   <input type="checkbox" id="fn-acompanantes" />
                   <span class="fn-icono">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1832,6 +1847,7 @@
       const NOMBRES_FN = {
         pases: "Pases",
         confirmacion: "Confirmación",
+        cantidad: "Cuántos vienen",
         mesa: "Mesa",
         acompanantes: "Acompañantes",
       };
@@ -2006,6 +2022,7 @@
         // el mundo. Los otros dos se piden aparte.
         $("fn-pases").checked = editando ? b.funciones?.pases !== false : true;
         $("fn-confirmacion").checked = editando ? Boolean(b.funciones?.confirmacion) : true;
+        $("fn-cantidad").checked = Boolean(b?.funciones?.cantidad);
         $("fn-mesa").checked = Boolean(b?.funciones?.mesa);
         $("fn-acompanantes").checked = Boolean(b?.funciones?.acompanantes);
         $("bd-registro").checked = editando ? Boolean(b.registro_abierto) : true;
@@ -2032,6 +2049,7 @@
           funciones: {
             pases: $("fn-pases").checked,
             confirmacion: $("fn-confirmacion").checked,
+            cantidad: $("fn-cantidad").checked,
             mesa: $("fn-mesa").checked,
             acompanantes: $("fn-acompanantes").checked,
           },
