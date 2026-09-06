@@ -1959,7 +1959,8 @@
           pantalla("pantalla-carga");
           fallo(
             "Tu cuenta todavía no tiene una boda asignada",
-            "Avisale al administrador para que te dé acceso."
+            "Avisale al administrador para que te dé acceso.",
+            true
           );
           return;
         }
@@ -3853,11 +3854,24 @@
       });
 
       // ═══ ARRANQUE ═══
-      function fallo(titulo, detalle) {
+      function fallo(titulo, detalle, conSalir = false) {
         $("carga-texto").classList.add("oculto");
         const caja = $("carga-error");
         caja.innerHTML =
           "<strong>" + titulo + "</strong><br><span style='opacity:.85'>" + detalle + "</span>";
+
+        // Sin esto, quien queda en esta pantalla no tiene cómo salir de su
+        // sesión para entrar con otro usuario: se queda encerrado.
+        if (conSalir) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "btn btn-linea btn-chico";
+          b.style.marginTop = ".9rem";
+          b.textContent = "Salir y entrar con otra cuenta";
+          b.addEventListener("click", salir);
+          caja.append(document.createElement("br"), b);
+        }
+
         caja.classList.remove("oculto");
       }
 
