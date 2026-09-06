@@ -1018,6 +1018,7 @@
             <div class="barra-acciones">
               <input id="buscador-bodas" type="search" class="campo"
                 placeholder="Buscar cliente…" />
+              <button id="btn-nuevo-cliente" class="btn btn-linea btn-chico" type="button">Nuevo cliente</button>
               <button id="btn-asignar" class="btn btn-linea btn-chico" type="button">Asignar cliente</button>
               <button id="btn-nueva-boda" class="btn btn-neon btn-chico" type="button">+ Nueva boda</button>
             </div>
@@ -1217,6 +1218,82 @@
             <button type="submit" class="btn btn-peligro" id="btn-borrar-boda">Borrar</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL NUEVO CLIENTE ═══ -->
+    <div id="modal-cliente" class="modal-fondo oculto">
+      <div class="modal">
+        <div class="modal-cabecera cabecera-rica">
+          <span class="cab-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M19 8v6M22 11h-6" />
+            </svg>
+          </span>
+          <strong>Nuevo cliente</strong>
+        </div>
+
+        <form id="form-cliente">
+          <div class="modal-cuerpo">
+            <div>
+              <label class="etiqueta" for="cl-boda">Boda</label>
+              <select id="cl-boda" class="campo" required></select>
+            </div>
+
+            <div>
+              <label class="etiqueta" for="cl-correo">Correo</label>
+              <input id="cl-correo" type="email" class="campo" required
+                placeholder="novios@boda.com" autocomplete="off" />
+              <p class="ayuda">Puede ser inventado: funciona como nombre de usuario.</p>
+            </div>
+
+            <div>
+              <label class="etiqueta" for="cl-clave">
+                Contraseña
+                <span class="etiqueta-auto" id="cl-generada">generada</span>
+              </label>
+              <div style="display:flex; gap:.5rem">
+                <input id="cl-clave" type="text" class="campo" required minlength="6"
+                  autocomplete="off" style="flex:1; min-width:0" />
+                <button type="button" id="btn-otra-clave" class="btn btn-linea btn-chico"
+                  style="flex:none">Otra</button>
+              </div>
+            </div>
+
+            <div class="vista-link">
+              <code id="cl-resumen"></code>
+            </div>
+
+            <p id="cliente-error" class="aviso aviso-error oculto"></p>
+          </div>
+
+          <div class="modal-pie">
+            <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+            <button type="submit" class="btn btn-neon" id="btn-crear-cliente">Crear cliente</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL DATOS DEL CLIENTE CREADO ═══ -->
+    <div id="modal-listo" class="modal-fondo oculto">
+      <div class="modal">
+        <div class="modal-cabecera">Cliente creado</div>
+        <div class="modal-cuerpo">
+          <p class="ayuda" style="margin:0">
+            Copiá este mensaje y mandáselo. La contraseña no se puede volver a ver
+            después de cerrar esta ventana.
+          </p>
+          <pre id="listo-mensaje" style="white-space:pre-wrap; word-break:break-word;
+            background:var(--fondo); border:1px solid var(--borde); border-radius:10px;
+            padding:.9rem 1rem; font-size:.82rem; line-height:1.5; margin:0"></pre>
+        </div>
+        <div class="modal-pie">
+          <button type="button" class="btn btn-linea" data-cerrar-modal>Cerrar</button>
+          <button type="button" class="btn btn-neon" id="btn-copiar-datos">Copiar mensaje</button>
+        </div>
       </div>
     </div>
 
@@ -1816,16 +1893,144 @@
         avisar("Boda borrada");
       });
 
-      // ── Asignar un cliente a su boda ──
-      $("btn-asignar").addEventListener("click", () => {
-        const sel = $("as-boda");
-        sel.innerHTML = "";
+      // ── Crear un cliente (usuario + boda, de una) ──
+      //
+      // El alta del usuario la hace una función que corre en el servidor de
+      // Supabase: necesita la clave maestra, que jamás puede estar acá.
+      // Ver supabase/functions/crear-cliente/index.ts
+
+      // Contraseña fácil de dictar por teléfono: sin caracteres que se
+      // confundan (0/O, 1/l/I) y sin símbolos raros.
+      function claveFacil() {
+        const letras = "abcdefghjkmnpqrstuvwxyz";
+        const numeros = "23456789";
+        const al = (s, n) => Array.from(
+          crypto.getRandomValues(new Uint32Array(n)),
+          (v) => s[v % s.length]
+        ).join("");
+        return al(letras, 4) + al(numeros, 4);
+      }
+
+      function llenarBodas(select) {
+        select.innerHTML = "";
         for (const b of bodas) {
           const o = document.createElement("option");
           o.value = b.id;
           o.textContent = b.nombre;
-          sel.append(o);
+          select.append(o);
         }
+      }
+
+      function pintarResumenCliente() {
+        const boda = bodas.find((b) => b.id === $("cl-boda").value);
+        $("cl-resumen").textContent =
+          (boda ? boda.nombre + " · " : "") +
+          ($("cl-correo").value.trim() || "correo") + " · " +
+          ($("cl-clave").value || "clave");
+      }
+
+      $("btn-nuevo-cliente").addEventListener("click", () => {
+        if (!bodas.length) {
+          avisar("Primero creá una boda");
+          return;
+        }
+        llenarBodas($("cl-boda"));
+        $("cl-correo").value = "";
+        $("cl-clave").value = claveFacil();
+        ver($("cl-generada"), true);
+        pintarResumenCliente();
+        mostrarError("cliente-error", "");
+        ver($("modal-cliente"), true);
+        $("cl-correo").focus();
+      });
+
+      $("btn-otra-clave").addEventListener("click", () => {
+        $("cl-clave").value = claveFacil();
+        ver($("cl-generada"), true);
+        pintarResumenCliente();
+      });
+
+      $("cl-clave").addEventListener("input", () => {
+        ver($("cl-generada"), false);
+        pintarResumenCliente();
+      });
+      $("cl-correo").addEventListener("input", pintarResumenCliente);
+      $("cl-boda").addEventListener("change", pintarResumenCliente);
+
+      function mensajeParaCliente(correo, clave, boda) {
+        return [
+          "¡Hola! Ya está listo el panel para cargar sus invitados 💌",
+          "",
+          "Entren acá:",
+          window.location.origin + "/admin",
+          "",
+          "Usuario: " + correo,
+          "Clave: " + clave,
+          "",
+          "Ahí cargan el nombre de cada invitado y cuántos pases le tocan.",
+          "El sistema arma un link personalizado para cada uno, que se copia",
+          'con el botón "Copiar mensaje" y se manda por WhatsApp.',
+          "",
+          "Pueden cargar de a poco, cuando quieran.",
+          "Cualquier duda me avisan 🤍",
+        ].join("\n");
+      }
+
+      $("form-cliente").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        mostrarError("cliente-error", "");
+        if (DEMO) { cerrarModales(); avisarDemo(); return; }
+
+        const correo = $("cl-correo").value.trim();
+        const clave = $("cl-clave").value;
+        const bodaId = $("cl-boda").value;
+        const boda = bodas.find((b) => b.id === bodaId);
+
+        if (clave.length < 6) {
+          mostrarError("cliente-error", "La contraseña tiene que tener al menos 6 caracteres.");
+          return;
+        }
+
+        $("btn-crear-cliente").disabled = true;
+        $("btn-crear-cliente").textContent = "Creando…";
+
+        const { data, error } = await supabase.functions.invoke("crear-cliente", {
+          body: { correo, clave, boda_id: bodaId },
+        });
+
+        $("btn-crear-cliente").disabled = false;
+        $("btn-crear-cliente").textContent = "Crear cliente";
+
+        // La función devuelve el motivo dentro del cuerpo aunque el código
+        // HTTP sea de error; sin esto se vería un "Edge Function returned a
+        // non-2xx status code" que no le dice nada a nadie.
+        if (error) {
+          let detalle = error.message;
+          try {
+            const cuerpo = await error.context?.json();
+            if (cuerpo?.error) detalle = cuerpo.error;
+          } catch { /* se queda con el mensaje genérico */ }
+          mostrarError("cliente-error", detalle);
+          return;
+        }
+        if (data?.error) {
+          mostrarError("cliente-error", data.error);
+          return;
+        }
+
+        cerrarModales();
+        $("listo-mensaje").textContent = mensajeParaCliente(correo, clave, boda?.nombre);
+        ver($("modal-listo"), true);
+        avisar("Cliente creado");
+      });
+
+      $("btn-copiar-datos").addEventListener("click", () => {
+        copiar($("listo-mensaje").textContent, "Mensaje copiado");
+      });
+
+      // ── Asignar un cliente a su boda ──
+      $("btn-asignar").addEventListener("click", () => {
+        llenarBodas($("as-boda"));
         $("as-correo").value = "";
         mostrarError("asignar-error", "");
         ver($("modal-asignar"), true);
@@ -2060,7 +2265,7 @@
       for (const btn of document.querySelectorAll("[data-cerrar-modal]")) {
         btn.addEventListener("click", cerrarModales);
       }
-      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda"]) {
+      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo"]) {
         $(id).addEventListener("click", (e) => {
           if (e.target === $(id)) cerrarModales();
         });
@@ -2070,10 +2275,10 @@
       });
 
       function cerrarModales() {
-        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda"]) {
+        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo"]) {
           ver($(id), false);
         }
-        for (const id of ["editar-error", "borrar-error", "boda-error", "asignar-error", "borrar-boda-error"]) {
+        for (const id of ["editar-error", "borrar-error", "boda-error", "asignar-error", "borrar-boda-error", "cliente-error"]) {
           mostrarError(id, "");
         }
         enEdicion = null;
