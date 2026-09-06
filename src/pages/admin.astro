@@ -472,6 +472,41 @@
 
       .vacio { padding: 2.5rem 1.25rem; text-align: center; color: var(--texto-tenue); }
 
+      /* Pestañas para filtrar la lista por estado de confirmación */
+      .filtros {
+        display: flex;
+        gap: .4rem;
+        flex-wrap: wrap;
+        padding: 0 1.25rem 1rem;
+      }
+      .filtro {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        border: 1px solid var(--borde);
+        background: transparent;
+        color: var(--texto-tenue);
+        border-radius: 999px;
+        padding: .38rem .9rem;
+        font: inherit;
+        font-size: .84rem;
+        cursor: pointer;
+        transition: all .16s;
+      }
+      .filtro:hover { border-color: var(--neon-brillo); color: var(--texto); }
+      .filtro b {
+        font-size: .78rem;
+        background: rgba(125, 143, 165, 0.16);
+        border-radius: 999px;
+        padding: 0 .4rem;
+      }
+      .filtro.activo {
+        background: var(--neon-fondo);
+        border-color: var(--neon);
+        color: var(--neon);
+      }
+      .filtro.activo b { background: rgba(0, 245, 160, 0.18); }
+
       /* Aviso de bodas que ya pasaron */
       .aviso-terminadas {
         display: flex;
@@ -1007,7 +1042,27 @@
           <section class="tarjeta">
             <div class="tarjeta-cabecera">
               <span class="tarjeta-titulo">Lista de invitados</span>
-              <input id="buscador" type="search" class="campo" placeholder="Buscar…" style="max-width: 230px" />
+              <div class="barra-acciones">
+                <input id="buscador" type="search" class="campo" placeholder="Buscar…" />
+                <button id="btn-excel" class="btn btn-linea btn-chico" type="button">
+                  Descargar Excel
+                </button>
+              </div>
+            </div>
+
+            <div class="filtros" id="filtros-estado">
+              <button class="filtro activo" type="button" data-estado="todos">
+                Todos <b id="f-todos">0</b>
+              </button>
+              <button class="filtro" type="button" data-estado="si">
+                Confirmaron <b id="f-si">0</b>
+              </button>
+              <button class="filtro" type="button" data-estado="no">
+                No asisten <b id="f-no">0</b>
+              </button>
+              <button class="filtro" type="button" data-estado="pendiente">
+                Sin responder <b id="f-pendiente">0</b>
+              </button>
             </div>
 
             <div style="overflow-x: auto">
@@ -1520,6 +1575,7 @@
       let invitados = [];      // los invitados de bodaActual
 
       let filtro = "";        // buscador de invitados
+      let estado = "todos";   // pestaña de confirmación
       let filtroBodas = "";   // buscador de clientes
       let enEdicion = null;
       let enBorrado = null;
@@ -2193,6 +2249,7 @@
         $("titulo-boda").textContent = data.nombre;
         $("marca-boda").textContent = data.nombre;
 
+        reiniciarFiltros();
         aplicarFunciones();
         aplicarPermisos();
         pantalla("pantalla-panel");
@@ -2524,9 +2581,15 @@
         cuerpo.innerHTML = "";
 
         const texto = filtro.trim().toLowerCase();
-        const visibles = texto
-          ? invitados.filter((i) => i.nombre.toLowerCase().includes(texto))
-          : invitados;
+        const porEstado = (i) =>
+          estado === "todos" ? true
+          : estado === "si" ? i.confirmado === true
+          : estado === "no" ? i.confirmado === false
+          : i.confirmado === null || i.confirmado === undefined;
+
+        const visibles = invitados.filter(
+          (i) => porEstado(i) && (!texto || i.nombre.toLowerCase().includes(texto))
+        );
 
         $("total-invitados").textContent = String(invitados.length);
         $("total-pases").textContent = String(invitados.reduce((s, i) => s + i.pases, 0));
@@ -2539,7 +2602,21 @@
         $("total-pendientes").textContent = String(
           invitados.filter((i) => i.confirmado === null || i.confirmado === undefined).length
         );
-        ver($("lista-vacia"), visibles.length === 0);
+        // Los números de cada pestaña
+        ver($("filtros-estado"), tiene("confirmacion"));
+        $("f-todos").textContent = String(invitados.length);
+        $("f-si").textContent = String(invitados.filter((i) => i.confirmado === true).length);
+        $("f-no").textContent = String(invitados.filter((i) => i.confirmado === false).length);
+        $("f-pendiente").textContent = String(
+          invitados.filter((i) => i.confirmado === null || i.confirmado === undefined).length
+        );
+
+        const vacia = $("lista-vacia");
+        vacia.textContent =
+          invitados.length === 0
+            ? "Todavía no hay invitados."
+            : "Ningún invitado en esta lista.";
+        ver(vacia, visibles.length === 0);
 
         const permitido = puedeEditar();
 
@@ -2638,6 +2715,27 @@
         pintarLista();
       });
 
+      for (const boton of document.querySelectorAll("[data-estado]")) {
+        boton.addEventListener("click", () => {
+          estado = boton.dataset.estado;
+          for (const otro of document.querySelectorAll("[data-estado]")) {
+            otro.classList.toggle("activo", otro === boton);
+          }
+          pintarLista();
+        });
+      }
+
+      // Al cambiar de boda se vuelve a "Todos": el filtro de la boda anterior
+      // no tiene por qué aplicarse a la nueva.
+      function reiniciarFiltros() {
+        estado = "todos";
+        filtro = "";
+        $("buscador").value = "";
+        for (const b of document.querySelectorAll("[data-estado]")) {
+          b.classList.toggle("activo", b.dataset.estado === "todos");
+        }
+      }
+
       $("buscador-bodas").addEventListener("input", (e) => {
         filtroBodas = e.target.value;
         pintarBodas();
@@ -2677,6 +2775,201 @@
         pantalla("pantalla-bodas");
         avisar("Modo demo: datos de ejemplo, no se guarda nada");
       }
+
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  DESCARGAR EN EXCEL
+      //
+      //  La librería se carga con import() al apretar el botón: pesa cerca
+      //  de un mega y casi nadie descarga. Cargarla siempre haría más lento
+      //  el panel para todos.
+      // ═══════════════════════════════════════════════════════════════════
+
+      // Los mismos colores de la invitación, para que el archivo se sienta
+      // parte del trabajo entregado y no una tabla cualquiera.
+      const AZUL = "FF122A4D";
+      const DORADO = "FFB7956B";
+      const CREMA = "FFF7F3EC";
+
+      function nombreDelArchivo(boda) {
+        const limpio = boda.nombre
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        const hoy = new Date().toISOString().slice(0, 10);
+        return "Invitados-" + limpio + "-" + hoy + ".xlsx";
+      }
+
+      async function descargarExcel() {
+        if (!bodaActual) return;
+        if (!invitados.length) {
+          avisar("No hay invitados para descargar");
+          return;
+        }
+
+        const boton = $("btn-excel");
+        boton.disabled = true;
+        boton.textContent = "Preparando…";
+
+        try {
+          const { default: ExcelJS } = await import("exceljs");
+
+          const libro = new ExcelJS.Workbook();
+          libro.creator = "Panel de invitados";
+          libro.created = new Date();
+
+          const hoja = libro.addWorksheet("Invitados", {
+            views: [{ state: "frozen", ySplit: 4 }],   // los títulos quedan fijos al bajar
+            pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1 },
+          });
+
+          const conf = tiene("confirmacion");
+          const conMesa = tiene("mesa");
+          const conAcomp = tiene("acompanantes");
+          const conPases = bodaActual.funciones?.pases !== false;
+
+          // ── Columnas, según lo que esa boda tenga contratado ──
+          const columnas = [{ header: "Invitado", key: "nombre", width: 34 }];
+          if (conPases) columnas.push({ header: "Pases", key: "pases", width: 9 });
+          if (conf) {
+            columnas.push({ header: "Confirmación", key: "estado", width: 16 });
+            columnas.push({ header: "Asisten", key: "asisten", width: 10 });
+          }
+          if (conMesa) columnas.push({ header: "Mesa", key: "mesa", width: 8 });
+          if (conAcomp) columnas.push({ header: "Acompañantes", key: "acompanantes", width: 32 });
+          if (conf) columnas.push({ header: "Respondió el", key: "cuando", width: 18 });
+
+          hoja.columns = columnas;
+
+          // ── Encabezado ──
+          const ultima = hoja.columnCount;
+          const letra = (n) => String.fromCharCode(64 + n);
+
+          hoja.mergeCells("A1:" + letra(ultima) + "1");
+          const titulo = hoja.getCell("A1");
+          titulo.value = bodaActual.nombre;
+          titulo.font = { size: 18, bold: true, color: { argb: "FFFFFFFF" }, name: "Calibri" };
+          titulo.alignment = { vertical: "middle", horizontal: "center" };
+          titulo.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+          hoja.getRow(1).height = 34;
+
+          hoja.mergeCells("A2:" + letra(ultima) + "2");
+          const bajada = hoja.getCell("A2");
+          const partes = ["Lista de invitados"];
+          if (bodaActual.fecha) {
+            partes.push(new Date(bodaActual.fecha + "T12:00:00").toLocaleDateString("es-BO", {
+              day: "numeric", month: "long", year: "numeric",
+            }));
+          }
+          partes.push("Al " + new Date().toLocaleDateString("es-BO"));
+          bajada.value = partes.join("  ·  ");
+          bajada.font = { size: 10, italic: true, color: { argb: AZUL } };
+          bajada.alignment = { vertical: "middle", horizontal: "center" };
+          bajada.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CREMA } };
+          hoja.getRow(2).height = 20;
+
+          // Fila 3 en blanco, para que respire
+          hoja.getRow(3).height = 6;
+
+          // ── Títulos de columna (fila 4) ──
+          const cabecera = hoja.getRow(4);
+          cabecera.values = columnas.map((c) => c.header);
+          cabecera.height = 22;
+          cabecera.eachCell((celda) => {
+            celda.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+            celda.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DORADO } };
+            celda.alignment = { vertical: "middle", horizontal: "center" };
+            celda.border = { bottom: { style: "thin", color: { argb: AZUL } } };
+          });
+
+          // ── Las filas ──
+          for (const inv of invitados) {
+            const fila = {
+              nombre: inv.nombre,
+              pases: inv.pases,
+              estado:
+                inv.confirmado === true ? "Confirmó"
+                : inv.confirmado === false ? "No asiste"
+                : "Sin responder",
+              asisten: inv.confirmado === true ? inv.asisten ?? 0 : 0,
+              mesa: inv.mesa ?? "",
+              acompanantes: (inv.acompanantes ?? []).join(", "),
+              cuando: inv.confirmado_en
+                ? new Date(inv.confirmado_en).toLocaleDateString("es-BO")
+                : "",
+            };
+
+            const r = hoja.addRow(fila);
+            r.height = 19;
+
+            r.eachCell((celda, n) => {
+              celda.border = { bottom: { style: "hair", color: { argb: "FFDDD5C8" } } };
+              celda.alignment = {
+                vertical: "middle",
+                horizontal: n === 1 || columnas[n - 1]?.key === "acompanantes" ? "left" : "center",
+              };
+            });
+
+            // El estado va en color: se lee la lista de un vistazo
+            if (conf) {
+              const col = columnas.findIndex((c) => c.key === "estado") + 1;
+              const celda = r.getCell(col);
+              if (inv.confirmado === true) {
+                celda.font = { bold: true, color: { argb: "FF1B7A4B" } };
+                celda.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F5EC" } };
+              } else if (inv.confirmado === false) {
+                celda.font = { bold: true, color: { argb: "FFA32638" } };
+                celda.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFAE9EC" } };
+              } else {
+                celda.font = { color: { argb: "FF8A8A8A" } };
+              }
+            }
+          }
+
+          // ── Totales ──
+          const totales = hoja.addRow({});
+          totales.height = 24;
+          hoja.mergeCells("A" + totales.number + ":" + letra(ultima) + totales.number);
+          const celdaTotal = hoja.getCell("A" + totales.number);
+
+          const resumen = [invitados.length + " invitados"];
+          if (conPases) resumen.push(invitados.reduce((a, i) => a + i.pases, 0) + " pases");
+          if (conf) {
+            resumen.push(invitados.filter((i) => i.confirmado === true).length + " confirmaron");
+            resumen.push(
+              invitados.reduce((a, i) => a + (i.confirmado === true ? i.asisten || 0 : 0), 0) +
+              " asistentes"
+            );
+          }
+          celdaTotal.value = resumen.join("   ·   ");
+          celdaTotal.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+          celdaTotal.alignment = { vertical: "middle", horizontal: "center" };
+          celdaTotal.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+
+          hoja.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: ultima } };
+
+          // ── Descargar ──
+          const datos = await libro.xlsx.writeBuffer();
+          const enlace = document.createElement("a");
+          enlace.href = URL.createObjectURL(
+            new Blob([datos], {
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            })
+          );
+          enlace.download = nombreDelArchivo(bodaActual);
+          enlace.click();
+          URL.revokeObjectURL(enlace.href);
+
+          avisar("Excel descargado");
+        } catch (e) {
+          avisar("No se pudo generar el Excel");
+          console.error(e);
+        } finally {
+          boton.disabled = false;
+          boton.textContent = "Descargar Excel";
+        }
+      }
+
+      $("btn-excel").addEventListener("click", descargarExcel);
 
       // ═══ ARRANQUE ═══
       function fallo(titulo, detalle) {
