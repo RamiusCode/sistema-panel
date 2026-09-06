@@ -71,6 +71,46 @@ Deno.serve(async (peticion) => {
     // ── 3. Los datos ──
     const { accion, correo, clave, boda_id } = await peticion.json();
 
+    // ═══ BORRAR UN CLIENTE ═══
+    // Se le quita el acceso y desaparece de la lista. Los invitados de la
+    // boda NO se tocan: son de la boda, no del usuario.
+    if (accion === "borrar") {
+      if (!correo) return responder({ error: "Falta el correo." }, 400);
+
+      const conLlave = createClient(URL_BASE, CLAVE_MAESTRA);
+
+      const { data: lista, error: errorLista } = await conLlave.auth.admin.listUsers({
+        page: 1, perPage: 1000,
+      });
+      if (errorLista) return responder({ error: errorLista.message }, 500);
+
+      const usuario = lista.users.find(
+        (u) => (u.email ?? "").toLowerCase() === correo.trim().toLowerCase()
+      );
+      if (!usuario) {
+        return responder({ error: "No existe ningún usuario con ese correo." }, 400);
+      }
+
+      // Nunca un administrador: borrarse a sí mismo dejaría el sistema sin
+      // nadie que pueda entrar, y eso no se arregla desde el panel.
+      const { data: perfilBorrar } = await conLlave
+        .from("perfiles").select("rol").eq("id", usuario.id).maybeSingle();
+
+      if (perfilBorrar?.rol === "super") {
+        return responder({
+          error: "Esa es una cuenta de administrador. No se borra desde acá.",
+        }, 400);
+      }
+
+      const { error: errorBorrar } = await conLlave.auth.admin.deleteUser(usuario.id);
+      if (errorBorrar) return responder({ error: errorBorrar.message }, 400);
+
+      // La copia del acceso se va con él
+      await conLlave.from("accesos").delete().eq("correo", (usuario.email ?? "").toLowerCase());
+
+      return responder({ ok: true, correo: usuario.email });
+    }
+
     // ═══ CAMBIAR LA CONTRASEÑA DE UN CLIENTE ═══
     // Las contraseñas no se pueden leer: la base solo guarda una huella que
     // no se puede revertir. Cuando un cliente la olvida, lo único posible es

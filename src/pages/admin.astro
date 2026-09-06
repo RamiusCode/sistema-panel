@@ -1461,6 +1461,11 @@
             </p>
           </div>
 
+          <p id="acceso-nota" class="ayuda oculto" style="margin:0">
+            Quitar el acceso borra el usuario del cliente, no sus invitados.
+            La lista de la boda queda intacta.
+          </p>
+
           <p id="acceso-error" class="aviso aviso-error oculto"></p>
         </div>
 
@@ -3567,6 +3572,7 @@
           caja.innerHTML =
             '<p class="ayuda">Esta boda todavía no tiene ningún cliente. ' +
             'Creale uno con <strong style="color:var(--texto)">Nuevo cliente</strong>.</p>';
+          ver($("acceso-nota"), false);
           return;
         }
 
@@ -3655,10 +3661,28 @@
           );
           acciones.append(btnAbrir);
 
+          // Borrar el acceso. Pide confirmar en el mismo botón: un modal
+          // arriba de otro se vuelve un laberinto, y esto no borra invitados.
+          let confirmando = false;
+          const btnBorrar = boton("Quitar acceso", "btn-peligro", () => {
+            if (!confirmando) {
+              confirmando = true;
+              btnBorrar.textContent = "¿Seguro?";
+              setTimeout(() => {
+                confirmando = false;
+                btnBorrar.textContent = "Quitar acceso";
+              }, 4000);
+              return;
+            }
+            borrarCliente(cl.correo, btnBorrar);
+          });
+          acciones.append(btnBorrar);
+
           fila.classList.add("fila-acceso");
           fila.append(texto, acciones, cambio);
           caja.append(fila);
         }
+        ver($("acceso-nota"), true);
       }
 
       async function cambiarClave(correo, clave, boton) {
@@ -3697,6 +3721,40 @@
         avisar("Contraseña cambiada");
 
         // La lista se rearma para que la clave nueva quede a la vista
+        if (bodaDelAcceso) abrirAcceso(bodaDelAcceso);
+      }
+
+      async function borrarCliente(correo, boton) {
+        if (DEMO) { avisarDemo(); return; }
+
+        boton.disabled = true;
+        boton.textContent = "Quitando…";
+        mostrarError("acceso-error", "");
+
+        const { data, error } = await supabase.functions.invoke("crear-cliente", {
+          body: { accion: "borrar", correo },
+        });
+
+        boton.disabled = false;
+        boton.textContent = "Quitar acceso";
+
+        if (error) {
+          let detalle = error.message;
+          try {
+            const cuerpo = await error.context?.json();
+            if (cuerpo?.error) detalle = cuerpo.error;
+          } catch { /* se queda con el mensaje genérico */ }
+          mostrarError("acceso-error", detalle);
+          return;
+        }
+        if (data?.error) {
+          mostrarError("acceso-error", data.error);
+          return;
+        }
+
+        avisar("Acceso quitado");
+        ver($("acceso-nueva-clave"), false);
+        ver($("btn-copiar-acceso"), false);
         if (bodaDelAcceso) abrirAcceso(bodaDelAcceso);
       }
 
