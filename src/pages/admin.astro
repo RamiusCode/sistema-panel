@@ -2663,7 +2663,13 @@
 
       // El campo "cuántos asisten" solo tiene sentido si dijo que sí.
       function sincronizarAsistentes() {
-        const asiste = tiene("confirmacion") && $("ed-confirmado").value === "si";
+        // Solo si la boda contrató elegir cuántos vienen. Para el resto, un
+        // invitado que confirma viene con todos sus pases, y el campo solo
+        // confundía: al editar los pases se pisaba sin querer.
+        const asiste =
+          tiene("confirmacion") &&
+          tiene("cantidad") &&
+          $("ed-confirmado").value === "si";
         ver($("caja-ed-asistentes"), asiste);
         if (asiste && Number($("ed-asistentes").value) < 1) {
           $("ed-asistentes").value = String(enEdicion?.pases ?? 1);
@@ -2704,10 +2710,15 @@
             );
             parche.acompanantes = nombres.slice(0, tope);
           }
+          // Sin la función de cantidad, quien confirma viene con todos sus
+          // pases: así, corregir los pases de 4 a 5 también corrige los que
+          // asisten, en vez de dejar el 4 viejo.
           parche.asisten =
-            confirmado === true
-              ? Math.min(Math.max(Number($("ed-asistentes").value) || 0, 1), pases)
-              : 0;
+            confirmado !== true
+              ? 0
+              : tiene("cantidad")
+                ? Math.min(Math.max(Number($("ed-asistentes").value) || 0, 1), pases)
+                : pases;
           // Si la respuesta cambió se sella la fecha; si no, se deja la que había
           const cambio = confirmado !== (enEdicion.confirmado ?? null);
           parche.confirmado_en =
