@@ -1044,9 +1044,14 @@
               <span class="tarjeta-titulo">Lista de invitados</span>
               <div class="barra-acciones">
                 <input id="buscador" type="search" class="campo" placeholder="Buscar…" />
+                <button id="btn-subir-excel" class="btn btn-linea btn-chico" type="button">
+                  Subir Excel
+                </button>
                 <button id="btn-excel" class="btn btn-linea btn-chico" type="button">
                   Descargar Excel
                 </button>
+                <input id="archivo-excel" type="file" class="oculto"
+                  accept=".xlsx,.xls,.csv" />
               </div>
             </div>
 
@@ -1323,6 +1328,47 @@
             <button type="submit" class="btn btn-peligro" id="btn-borrar-boda">Borrar</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ═══ MODAL SUBIR EXCEL ═══ -->
+    <div id="modal-importar" class="modal-fondo oculto">
+      <div class="modal modal-ancho">
+        <div class="modal-cabecera cabecera-rica">
+          <span class="cab-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="M17 8l-5-5-5 5M12 3v13" />
+            </svg>
+          </span>
+          <strong>Revisar antes de agregar</strong>
+        </div>
+
+        <div class="modal-cuerpo">
+          <div class="vista-link">
+            <code id="imp-resumen"></code>
+          </div>
+
+          <div>
+            <label class="etiqueta">Columnas encontradas</label>
+            <div id="imp-columnas" class="fn-grid"></div>
+          </div>
+
+          <div>
+            <label class="etiqueta">Primeros invitados</label>
+            <div style="overflow-x:auto">
+              <table class="tabla"><tbody id="imp-tabla"></tbody></table>
+            </div>
+          </div>
+
+          <p id="imp-aviso" class="aviso aviso-atencion oculto"></p>
+          <p id="importar-error" class="aviso aviso-error oculto"></p>
+        </div>
+
+        <div class="modal-pie">
+          <button type="button" class="btn btn-linea" data-cerrar-modal>Cancelar</button>
+          <button type="button" class="btn btn-neon" id="btn-importar-confirmar">Agregar</button>
+        </div>
       </div>
     </div>
 
@@ -2419,7 +2465,7 @@
       for (const btn of document.querySelectorAll("[data-cerrar-modal]")) {
         btn.addEventListener("click", cerrarModales);
       }
-      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo"]) {
+      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo", "modal-importar"]) {
         $(id).addEventListener("click", (e) => {
           if (e.target === $(id)) cerrarModales();
         });
@@ -2429,10 +2475,10 @@
       });
 
       function cerrarModales() {
-        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo"]) {
+        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo", "modal-importar"]) {
           ver($(id), false);
         }
-        for (const id of ["editar-error", "borrar-error", "boda-error", "asignar-error", "borrar-boda-error", "cliente-error"]) {
+        for (const id of ["editar-error", "borrar-error", "boda-error", "asignar-error", "borrar-boda-error", "cliente-error", "importar-error"]) {
           mostrarError(id, "");
         }
         enEdicion = null;
@@ -2970,6 +3016,299 @@
       }
 
       $("btn-excel").addEventListener("click", descargarExcel);
+
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  SUBIR UNA LISTA DESDE EXCEL
+      //
+      //  Muchos novios ya tienen su lista armada en Excel, cada uno con sus
+      //  títulos y su orden. En vez de pedirles una plantilla, se buscan las
+      //  columnas por el nombre del encabezado, venga como venga.
+      // ═══════════════════════════════════════════════════════════════════
+
+      // Sin acentos, sin mayúsculas, sin espacios de sobra: así "PASES  " y
+      // "Pases" son lo mismo.
+      function normalizar(texto) {
+        return String(texto ?? "")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase().trim();
+      }
+
+      // Cómo suele llamarse cada columna en las listas que manda la gente
+      const SINONIMOS = {
+        nombre: ["nombre", "nombres", "invitado", "invitados", "apellido", "apellidos",
+                 "familia", "nombre completo", "nombre y apellido", "name", "guest"],
+        pases: ["pases", "pase", "cantidad", "cant", "cupos", "cupo", "boletos", "tickets",
+                "entradas", "personas", "nro personas", "n personas", "cantidad de pases"],
+        mesa: ["mesa", "mesas", "nro mesa", "n mesa", "numero de mesa", "table"],
+      };
+
+      function queColumnaEs(titulo) {
+        const t = normalizar(titulo);
+        if (!t) return null;
+        for (const [campo, nombres] of Object.entries(SINONIMOS)) {
+          if (nombres.includes(t)) return campo;
+        }
+        // Si no coincide exacto, alcanza con que empiece igual: "pases (adultos)"
+        for (const [campo, nombres] of Object.entries(SINONIMOS)) {
+          if (nombres.some((n) => t.startsWith(n))) return campo;
+        }
+        return null;
+      }
+
+      /**
+       * Busca la fila de títulos. No siempre es la primera: las listas suelen
+       * traer el nombre de los novios y una fila en blanco arriba.
+       * Se toma la primera fila donde se reconozca la columna del nombre.
+       */
+      function buscarEncabezado(filas) {
+        for (let i = 0; i < Math.min(filas.length, 15); i++) {
+          const mapa = {};
+          filas[i].forEach((celda, n) => {
+            const campo = queColumnaEs(celda);
+            if (campo && mapa[campo] === undefined) mapa[campo] = n;
+          });
+          if (mapa.nombre !== undefined) return { fila: i, mapa };
+        }
+        return null;
+      }
+
+      // Un CSV chico, hecho a mano: no vale la pena otra librería para esto.
+      // Contempla comillas, y separador coma o punto y coma (Excel en español
+      // guarda con punto y coma).
+      function leerCSV(texto) {
+        const sep = (texto.split("\n")[0].match(/;/g) || []).length >
+                    (texto.split("\n")[0].match(/,/g) || []).length ? ";" : ",";
+        const filas = [];
+        let fila = [], campo = "", entreComillas = false;
+
+        for (let i = 0; i < texto.length; i++) {
+          const ch = texto[i];
+          if (entreComillas) {
+            if (ch === '"') {
+              if (texto[i + 1] === '"') { campo += '"'; i++; }
+              else entreComillas = false;
+            } else campo += ch;
+          } else if (ch === '"') entreComillas = true;
+          else if (ch === sep) { fila.push(campo); campo = ""; }
+          else if (ch === "\n") { fila.push(campo); filas.push(fila); fila = []; campo = ""; }
+          else if (ch !== "\r") campo += ch;
+        }
+        if (campo || fila.length) { fila.push(campo); filas.push(fila); }
+        return filas;
+      }
+
+      let paraImportar = [];
+
+      $("btn-subir-excel").addEventListener("click", () => {
+        if (DEMO) { avisarDemo(); return; }
+        if (!puedeEditar()) { avisar("El registro está cerrado"); return; }
+        $("archivo-excel").value = "";     // permite subir el mismo archivo dos veces
+        $("archivo-excel").click();
+      });
+
+      $("archivo-excel").addEventListener("change", async (e) => {
+        const archivo = e.target.files?.[0];
+        if (!archivo) return;
+
+        avisar("Leyendo el archivo…");
+
+        try {
+          let filas = [];
+
+          if (/\.csv$/i.test(archivo.name)) {
+            filas = leerCSV(await archivo.text());
+          } else {
+            const { default: ExcelJS } = await import("exceljs");
+            const libro = new ExcelJS.Workbook();
+            await libro.xlsx.load(await archivo.arrayBuffer());
+            const hoja = libro.worksheets[0];
+            if (!hoja) throw new Error("El archivo no tiene ninguna hoja.");
+
+            hoja.eachRow({ includeEmpty: false }, (fila) => {
+              const valores = [];
+              fila.eachCell({ includeEmpty: true }, (celda, n) => {
+                const v = celda.value;
+                valores[n - 1] =
+                  v == null ? ""
+                  : typeof v === "object"
+                    ? (v.text ?? v.result ?? v.richText?.map((r) => r.text).join("") ?? "")
+                    : v;
+              });
+              filas.push(valores);
+            });
+          }
+
+          const encabezado = buscarEncabezado(filas);
+          if (!encabezado) {
+            avisar("No encontré una columna de nombres");
+            mostrarError(
+              "importar-error",
+              "No encontré ninguna columna que se llame Nombre, Invitado o Familia. " +
+              "Ponele ese título a la columna de los nombres y volvé a subirlo."
+            );
+            ver($("modal-importar"), true);
+            $("imp-resumen").textContent = archivo.name;
+            $("imp-columnas").innerHTML = "";
+            $("imp-tabla").innerHTML = "";
+            ver($("imp-aviso"), false);
+            $("btn-importar-confirmar").disabled = true;
+            return;
+          }
+
+          const { fila: filaTitulos, mapa } = encabezado;
+          const yaEstan = new Set(invitados.map((i) => normalizar(i.nombre)));
+          const repetidos = [];
+          paraImportar = [];
+
+          for (let i = filaTitulos + 1; i < filas.length; i++) {
+            const nombre = String(filas[i][mapa.nombre] ?? "").trim();
+            if (!nombre) continue;                      // fila vacía o separador
+
+            if (yaEstan.has(normalizar(nombre))) { repetidos.push(nombre); continue; }
+            yaEstan.add(normalizar(nombre));
+
+            const crudoPases = mapa.pases !== undefined ? filas[i][mapa.pases] : null;
+            const pases = Math.min(Math.max(parseInt(crudoPases, 10) || 1, 1), 30);
+
+            const crudoMesa = mapa.mesa !== undefined ? filas[i][mapa.mesa] : null;
+            const mesa = parseInt(crudoMesa, 10) || null;
+
+            paraImportar.push({ nombre: nombre.slice(0, 80), pases, mesa });
+          }
+
+          // ── Pantalla de revisión ──
+          mostrarError("importar-error", "");
+          $("imp-resumen").textContent =
+            archivo.name + "  ·  " + paraImportar.length +
+            (paraImportar.length === 1 ? " invitado" : " invitados");
+
+          const nombresCol = { nombre: "Nombre", pases: "Pases", mesa: "Mesa" };
+          $("imp-columnas").innerHTML = "";
+          for (const campo of ["nombre", "pases", "mesa"]) {
+            if (campo === "mesa" && !tiene("mesa")) continue;
+            const encontrada = mapa[campo] !== undefined;
+            const caja = document.createElement("div");
+            caja.className = "fn-card";
+            caja.style.cursor = "default";
+            caja.innerHTML =
+              '<span class="fn-icono"></span>' +
+              '<span class="fn-texto"><strong>' + nombresCol[campo] + "</strong></span>" +
+              '<span class="marca-conf ' + (encontrada ? "marca-si" : "marca-pendiente") + '">' +
+              (encontrada
+                ? String(filas[filaTitulos][mapa[campo]] ?? "").trim() || "columna " + (mapa[campo] + 1)
+                : campo === "pases" ? "sin columna · va 1" : "no está") +
+              "</span>";
+            $("imp-columnas").append(caja);
+          }
+
+          $("imp-tabla").innerHTML = "";
+          for (const inv of paraImportar.slice(0, 5)) {
+            const tr = document.createElement("tr");
+            const td1 = document.createElement("td");
+            td1.dataset.rotulo = "Invitado";
+            td1.className = "celda-nombre";
+            td1.textContent = inv.nombre;
+            const td2 = document.createElement("td");
+            td2.dataset.rotulo = "Pases";
+            td2.textContent = String(inv.pases);
+            tr.append(td1, td2);
+            if (tiene("mesa")) {
+              const td3 = document.createElement("td");
+              td3.dataset.rotulo = "Mesa";
+              td3.textContent = inv.mesa ?? "—";
+              tr.append(td3);
+            }
+            $("imp-tabla").append(tr);
+          }
+
+          const avisos = [];
+          if (repetidos.length) {
+            avisos.push(
+              repetidos.length + (repetidos.length === 1 ? " nombre ya estaba" : " nombres ya estaban") +
+              " en la lista y se saltean: " + repetidos.slice(0, 5).join(", ") +
+              (repetidos.length > 5 ? "…" : "")
+            );
+          }
+          if (mapa.pases === undefined) {
+            avisos.push("No había columna de pases: todos entran con 1 y se corrigen después.");
+          }
+          $("imp-aviso").textContent = avisos.join("  ");
+          ver($("imp-aviso"), avisos.length > 0);
+
+          $("btn-importar-confirmar").disabled = paraImportar.length === 0;
+          $("btn-importar-confirmar").textContent =
+            paraImportar.length ? "Agregar " + paraImportar.length : "No hay nada para agregar";
+
+          ver($("modal-importar"), true);
+        } catch (err) {
+          avisar("No se pudo leer el archivo");
+          console.error(err);
+          mostrarError("importar-error", "No se pudo leer el archivo: " + (err?.message || err));
+          ver($("modal-importar"), true);
+        }
+      });
+
+      $("btn-importar-confirmar").addEventListener("click", async () => {
+        if (!paraImportar.length || !bodaActual) return;
+
+        const boton = $("btn-importar-confirmar");
+        boton.disabled = true;
+        mostrarError("importar-error", "");
+
+        const conMesa = tiene("mesa");
+        const sinPases = bodaActual.funciones?.pases === false;
+        const pendientes = paraImportar.map((x) => ({
+          nombre: x.nombre,
+          pases: sinPases ? 1 : x.pases,
+          ...(conMesa ? { mesa: x.mesa } : {}),
+          boda_id: bodaActual.id,
+        }));
+
+        let guardados = 0;
+
+        // De a 50: una sola consulta por tanda en vez de una por invitado.
+        for (let i = 0; i < pendientes.length; i += 50) {
+          const tanda = pendientes.slice(i, i + 50);
+          let ok = false;
+
+          // Los códigos son al azar; si alguno choca con uno existente se
+          // rehace la tanda con códigos nuevos.
+          for (let intento = 0; intento < 4 && !ok; intento++) {
+            boton.textContent = "Agregando… " + guardados + "/" + pendientes.length;
+
+            const { data, error } = await supabase
+              .from("invitados")
+              .insert(tanda.map((x) => ({ ...x, codigo: generarCodigo() })))
+              .select(COLUMNAS);
+
+            if (!error) {
+              for (const fila of data ?? []) {
+                if (!invitados.some((i) => i.id === fila.id)) invitados.unshift(fila);
+              }
+              guardados += tanda.length;
+              ok = true;
+            } else if (error.code !== "23505") {
+              mostrarError("importar-error", traducirError(error));
+              boton.disabled = false;
+              boton.textContent = "Agregar";
+              pintarLista();
+              return;
+            }
+          }
+
+          if (!ok) {
+            mostrarError("importar-error", "No se pudieron generar códigos únicos. Probá de nuevo.");
+            break;
+          }
+        }
+
+        boton.disabled = false;
+        boton.textContent = "Agregar";
+        cerrarModales();
+        pintarLista();
+        avisar(guardados + (guardados === 1 ? " invitado agregado" : " invitados agregados"));
+      });
 
       // ═══ ARRANQUE ═══
       function fallo(titulo, detalle) {
