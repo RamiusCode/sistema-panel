@@ -2621,11 +2621,12 @@
         ].join("\n");
       }
 
-      // ═══ PINTAR LA LISTA DE INVITADOS ═══
-      function pintarLista() {
-        const cuerpo = $("lista");
-        cuerpo.innerHTML = "";
-
+      /**
+       * Los invitados que se están viendo: la pestaña elegida más el buscador.
+       * La usan la tabla y el Excel, para que lo que se descarga sea lo mismo
+       * que se ve en pantalla.
+       */
+      function invitadosFiltrados() {
         const texto = filtro.trim().toLowerCase();
         const porEstado = (i) =>
           estado === "todos" ? true
@@ -2633,9 +2634,24 @@
           : estado === "no" ? i.confirmado === false
           : i.confirmado === null || i.confirmado === undefined;
 
-        const visibles = invitados.filter(
+        return invitados.filter(
           (i) => porEstado(i) && (!texto || i.nombre.toLowerCase().includes(texto))
         );
+      }
+
+      const NOMBRE_ESTADO = {
+        todos: "",
+        si: "Confirmaron",
+        no: "No asisten",
+        pendiente: "Sin responder",
+      };
+
+      // ═══ PINTAR LA LISTA DE INVITADOS ═══
+      function pintarLista() {
+        const cuerpo = $("lista");
+        cuerpo.innerHTML = "";
+
+        const visibles = invitadosFiltrados();
 
         $("total-invitados").textContent = String(invitados.length);
         $("total-pases").textContent = String(invitados.reduce((s, i) => s + i.pases, 0));
@@ -2838,16 +2854,23 @@
       const CREMA = "FFF7F3EC";
 
       function nombreDelArchivo(boda) {
-        const limpio = boda.nombre
+        const limpio = (t) => t
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
           .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
         const hoy = new Date().toISOString().slice(0, 10);
-        return "Invitados-" + limpio + "-" + hoy + ".xlsx";
+        // La pestaña va en el nombre: si se bajan varios, no se pisan.
+        const cual = NOMBRE_ESTADO[estado] ? "-" + limpio(NOMBRE_ESTADO[estado]) : "";
+        return "Invitados-" + limpio(boda.nombre) + cual + "-" + hoy + ".xlsx";
       }
 
       async function descargarExcel() {
         if (!bodaActual) return;
-        if (!invitados.length) {
+
+        // Se baja exactamente lo que se está viendo: la pestaña elegida más
+        // el buscador. Si no, el archivo no coincide con la pantalla y hay
+        // que explicarlo cada vez.
+        const lista = invitadosFiltrados();
+        if (!lista.length) {
           avisar("No hay invitados para descargar");
           return;
         }
@@ -2900,7 +2923,8 @@
 
           hoja.mergeCells("A2:" + letra(ultima) + "2");
           const bajada = hoja.getCell("A2");
-          const partes = ["Lista de invitados"];
+          const partes = [NOMBRE_ESTADO[estado] || "Lista de invitados"];
+          if (filtro.trim()) partes.push("Buscando “" + filtro.trim() + "”");
           if (bodaActual.fecha) {
             partes.push(new Date(bodaActual.fecha + "T12:00:00").toLocaleDateString("es-BO", {
               day: "numeric", month: "long", year: "numeric",
@@ -2928,7 +2952,7 @@
           });
 
           // ── Las filas ──
-          for (const inv of invitados) {
+          for (const inv of lista) {
             const fila = {
               nombre: inv.nombre,
               pases: inv.pases,
@@ -2977,14 +3001,18 @@
           hoja.mergeCells("A" + totales.number + ":" + letra(ultima) + totales.number);
           const celdaTotal = hoja.getCell("A" + totales.number);
 
-          const resumen = [invitados.length + " invitados"];
-          if (conPases) resumen.push(invitados.reduce((a, i) => a + i.pases, 0) + " pases");
+          const resumen = [lista.length + (lista.length === 1 ? " invitado" : " invitados")];
+          if (conPases) resumen.push(lista.reduce((a, i) => a + i.pases, 0) + " pases");
           if (conf) {
-            resumen.push(invitados.filter((i) => i.confirmado === true).length + " confirmaron");
+            resumen.push(lista.filter((i) => i.confirmado === true).length + " confirmaron");
             resumen.push(
-              invitados.reduce((a, i) => a + (i.confirmado === true ? i.asisten || 0 : 0), 0) +
+              lista.reduce((a, i) => a + (i.confirmado === true ? i.asisten || 0 : 0), 0) +
               " asistentes"
             );
+          }
+          // Si se bajó solo una parte, se aclara sobre cuántos es
+          if (lista.length !== invitados.length) {
+            resumen.push("de " + invitados.length + " en total");
           }
           celdaTotal.value = resumen.join("   ·   ");
           celdaTotal.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
