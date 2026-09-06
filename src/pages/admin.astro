@@ -3519,34 +3519,77 @@
             );
           }
 
-          const btnClave = document.createElement("button");
-          btnClave.type = "button";
-          btnClave.className = "btn btn-linea btn-chico";
-          btnClave.style.whiteSpace = "nowrap";
-          btnClave.textContent = "Nueva contraseña";
-          btnClave.addEventListener("click", () => nuevaClave(cl.correo, btnClave));
-          acciones.append(btnClave);
+          // ── Cambiar la contraseña: escrita a mano o generada ──
+          const cambio = document.createElement("div");
+          cambio.className = "oculto";
+          cambio.style.cssText =
+            "grid-column:1/-1; display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.6rem";
+
+          const campo = document.createElement("input");
+          campo.type = "text";
+          campo.className = "campo";
+          campo.minLength = 6;
+          campo.autocomplete = "off";
+          campo.placeholder = "Contraseña nueva";
+          campo.style.cssText = "flex:1; min-width:140px";
+
+          const btnOtra = boton("Generar", "btn-linea", () => {
+            campo.value = claveFacil();
+            campo.focus();
+          });
+
+          const btnGuardar = boton("Guardar", "btn-neon", () => {
+            const nueva = campo.value.trim();
+            if (nueva.length < 6) {
+              mostrarError("acceso-error", "La contraseña tiene que tener al menos 6 caracteres.");
+              campo.focus();
+              return;
+            }
+            cambiarClave(cl.correo, nueva, btnGuardar);
+          });
+
+          // Enter guarda: es un campo solo, no hace falta ir hasta el botón
+          campo.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); btnGuardar.click(); }
+          });
+
+          cambio.append(campo, btnOtra, btnGuardar);
+
+          const btnAbrir = boton(
+            guardada ? "Cambiar contraseña" : "Poner contraseña",
+            "btn-linea",
+            () => {
+              const abriendo = cambio.classList.contains("oculto");
+              ver(cambio, abriendo);
+              if (abriendo) {
+                campo.value = claveFacil();   // viene una sugerida, se puede borrar
+                campo.focus();
+                campo.select();
+              }
+            }
+          );
+          acciones.append(btnAbrir);
 
           fila.style.gridTemplateColumns = "1fr auto";
-          fila.append(texto, acciones);
+          fila.append(texto, acciones, cambio);
           caja.append(fila);
         }
       }
 
-      async function nuevaClave(correo, boton) {
+      async function cambiarClave(correo, clave, boton) {
         if (DEMO) { avisarDemo(); return; }
 
         boton.disabled = true;
-        boton.textContent = "Generando…";
+        const original = boton.textContent;
+        boton.textContent = "Guardando…";
         mostrarError("acceso-error", "");
 
-        const clave = claveFacil();
         const { data, error } = await supabase.functions.invoke("crear-cliente", {
           body: { accion: "clave", correo, clave },
         });
 
         boton.disabled = false;
-        boton.textContent = "Nueva contraseña";
+        boton.textContent = original;
 
         if (error) {
           let detalle = error.message;
@@ -3567,6 +3610,9 @@
         ver($("acceso-nueva-clave"), true);
         ver($("btn-copiar-acceso"), true);
         avisar("Contraseña cambiada");
+
+        // La lista se rearma para que la clave nueva quede a la vista
+        if (bodaDelAcceso) abrirAcceso(bodaDelAcceso);
       }
 
       $("btn-copiar-acceso").addEventListener("click", () => {
