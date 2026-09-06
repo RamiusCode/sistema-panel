@@ -2278,7 +2278,7 @@
               : "marca-pendiente"
             );
             marca.textContent =
-              inv.confirmado === true ? "Asiste · " + (inv.asisten || 0)
+              inv.confirmado === true ? "Confirmó · " + (inv.asisten || 0)
               : inv.confirmado === false ? "No asiste"
               : "Sin responder";
             if (inv.confirmado_en) {
