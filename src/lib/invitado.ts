@@ -31,6 +31,28 @@ export function codigoDelLink(): string | null {
   return codigo && codigo.trim() ? codigo.trim() : null;
 }
 
+/**
+ * En qué quedó la búsqueda del código del link:
+ *
+ *   sin-codigo     el link no trae ?i=, es la invitación genérica
+ *   ok             se encontró al invitado
+ *   no-existe      el código no está en la base: lo borraron
+ *   sin-respuesta  la base no contestó (pausada, sin internet)
+ *
+ * La diferencia entre los dos últimos importa: a un invitado borrado hay
+ * que decírselo, pero si lo que falla es la conexión la invitación tiene
+ * que seguir mostrándose como si nada.
+ */
+export type EstadoLink = "sin-codigo" | "ok" | "no-existe" | "sin-respuesta";
+
+let estado: EstadoLink = "sin-codigo";
+
+/** Espera a que termine la búsqueda y dice en qué quedó. */
+export async function estadoDelLink(): Promise<EstadoLink> {
+  await datosInvitado();
+  return estado;
+}
+
 // Varios componentes piden los mismos datos. Se guarda la promesa para que la
 // consulta salga UNA sola vez por visita, la pidan dos componentes o cinco.
 let pedido: Promise<Invitado | null> | null = null;
@@ -53,17 +75,99 @@ export function datosInvitado(): Promise<Invitado | null> {
 
   pedido = import("./supabase")
     .then(({ supabase, configurado }) => {
-      if (!configurado || !supabase) return null;
+      if (!configurado || !supabase) {
+        estado = "sin-respuesta";
+        return null;
+      }
       return supabase
         .rpc("buscar_invitado", { codigo_buscado: codigo })
         .then(({ data, error }: { data: Invitado[] | null; error: unknown }) => {
-          if (error || !data || !data.length) return null;
+          if (error) {
+            estado = "sin-respuesta";
+            return null;
+          }
+          if (!data || !data.length) {
+            // La base contestó y no hay nadie con ese código: lo borraron.
+            estado = "no-existe";
+            return null;
+          }
+          estado = "ok";
           return data[0];
         });
     })
-    .catch(() => null);
+    .catch(() => {
+      estado = "sin-respuesta";
+      return null;
+    });
 
   return pedido;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MANTENERSE AL DÍA
+//
+//  Si los novios corrigen los pases o borran a alguien mientras el invitado
+//  tiene la invitación abierta, conviene que la pantalla se entere.
+//
+//  No se usa la conexión en vivo de Supabase a propósito: el invitado es
+//  anónimo y la base no le manda nada, que es justo lo que impide que un
+//  curioso se quede escuchando los cambios de toda la lista. Así que se
+//  vuelve a preguntar cada tanto, y sobre todo al volver a la pestaña, que
+//  es cuando de verdad pasa: el invitado deja la página abierta, los novios
+//  corrigen, el invitado vuelve.
+// ═══════════════════════════════════════════════════════════════════════════
+
+type Escucha = (invitado: Invitado | null, estado: EstadoLink) => void;
+
+const escuchas: Escucha[] = [];
+let vigilando = false;
+let ultimo = "";
+
+/** Avisa cada vez que cambian los datos del invitado del link. */
+export function alCambiarInvitado(fn: Escucha): void {
+  escuchas.push(fn);
+  vigilar();
+}
+
+async function revisar(): Promise<void> {
+  // Con la pestaña en segundo plano no se consulta: el invitado no está
+  // mirando y no tiene sentido gastarle datos.
+  if (typeof document !== "undefined" && document.hidden) return;
+  if (!codigoDelLink()) return;
+
+  pedido = null;                       // se fuerza una consulta nueva
+  const invitado = await datosInvitado();
+
+  const ahora = JSON.stringify([invitado, estado]);
+  if (ahora === ultimo) return;        // nada cambió, nadie se entera
+  ultimo = ahora;
+
+  for (const fn of escuchas) {
+    try {
+      fn(invitado, estado);
+    } catch {
+      /* que un componente falle no puede dejar sin avisar a los demás */
+    }
+  }
+}
+
+function vigilar(): void {
+  if (vigilando || typeof window === "undefined") return;
+  if (!codigoDelLink()) return;        // sin código no hay nada que vigilar
+  vigilando = true;
+
+  datosInvitado().then((inv) => {
+    ultimo = JSON.stringify([inv, estado]);
+  });
+
+  // Al volver a la pestaña, de inmediato
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) revisar();
+  });
+  window.addEventListener("focus", revisar);
+
+  // Y cada 45 segundos mientras se esté mirando
+  setInterval(revisar, 45000);
 }
 
 /**
