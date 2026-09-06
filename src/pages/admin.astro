@@ -1504,6 +1504,13 @@
               <label class="etiqueta" for="ed-mesa">Mesa</label>
               <input id="ed-mesa" type="number" class="campo" min="1" max="200" />
             </div>
+            <div id="caja-ed-acompanantes" class="oculto">
+              <label class="etiqueta" for="ed-acompanantes">Acompañantes</label>
+              <input id="ed-acompanantes" type="text" class="campo"
+                placeholder="Ana López, Luis López" autocomplete="off" />
+              <p class="ayuda">Separados por coma. Los carga el invitado al confirmar,
+                pero se pueden corregir acá.</p>
+            </div>
             <div id="caja-ed-asistentes">
               <label class="etiqueta" for="ed-asistentes">Cuántos asisten</label>
               <input id="ed-asistentes" type="number" class="campo" min="0" max="30" />
@@ -2320,6 +2327,7 @@
         ver($("th-mesa"), tiene("mesa"));
         ver($("caja-in-mesa"), tiene("mesa"));
         ver($("caja-ed-mesa"), tiene("mesa"));
+        ver($("caja-ed-acompanantes"), tiene("acompanantes"));
         ver($("ed-confirmado").parentElement, conf);
         ver($("total-confirmados").parentElement, conf);
         ver($("total-asistentes").parentElement, conf);
@@ -2495,6 +2503,7 @@
         $("ed-confirmado").value =
           inv.confirmado === true ? "si" : inv.confirmado === false ? "no" : "";
         $("ed-asistentes").value = String(inv.asisten ?? 0);
+        $("ed-acompanantes").value = (inv.acompanantes ?? []).join(", ");
         sincronizarAsistentes();
         mostrarError("editar-error", "");
         ver($("modal-editar"), true);
@@ -2531,6 +2540,19 @@
           const respuesta = $("ed-confirmado").value;
           const confirmado = respuesta === "si" ? true : respuesta === "no" ? false : null;
           parche.confirmado = confirmado;
+          if (tiene("acompanantes")) {
+            // Se recortan a los que caben: el invitado principal ya cuenta,
+            // así que los acompañantes son asisten - 1.
+            const nombres = $("ed-acompanantes").value
+              .split(",").map((n) => n.trim()).filter(Boolean);
+            const tope = Math.max(
+              (confirmado === true
+                ? Math.min(Math.max(Number($("ed-asistentes").value) || 0, 1), pases)
+                : 0) - 1,
+              0
+            );
+            parche.acompanantes = nombres.slice(0, tope);
+          }
           parche.asisten =
             confirmado === true
               ? Math.min(Math.max(Number($("ed-asistentes").value) || 0, 1), pases)
