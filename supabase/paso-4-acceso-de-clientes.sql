@@ -89,15 +89,22 @@ notify pgrst, 'reload schema';
 
 -- ───────────────────────────────────────────────────────────────────────────
 --  3. COMPROBACIÓN
---     Devuelve los clientes de cada boda. La columna `clave` va a estar
---     vacía hasta que crees un cliente nuevo desde el panel.
+--
+--     Lee las tablas directamente en vez de llamar a clientes_de(). Esa
+--     función exige ser administrador, y el editor de SQL no corre como tu
+--     usuario sino como el dueño de la base: se negaría a sí misma, y como
+--     todo el texto corre junto, el error desharía también lo de arriba.
+--
+--     La columna `clave` va a estar vacía hasta que crees un cliente nuevo
+--     desde el panel, o le generes una contraseña nueva.
 -- ───────────────────────────────────────────────────────────────────────────
 
-select b.nombre as boda,
-       c.correo,
+select b.nombre                as boda,
+       u.email                 as correo,
        a.clave,
-       c.ultimo_ingreso
+       u.last_sign_in_at       as ultimo_ingreso
 from public.bodas b
-left join lateral public.clientes_de(b.id) c on true
-left join public.accesos a on a.correo = c.correo
+left join public.perfiles p on p.boda_id = b.id and p.rol = 'novio'
+left join auth.users u      on u.id = p.id
+left join public.accesos a  on lower(a.correo) = lower(u.email)
 order by b.fecha;
