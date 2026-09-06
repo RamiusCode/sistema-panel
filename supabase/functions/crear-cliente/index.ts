@@ -69,7 +69,59 @@ Deno.serve(async (peticion) => {
     }
 
     // ── 3. Los datos ──
-    const { correo, clave, boda_id } = await peticion.json();
+    const { accion, correo, clave, boda_id } = await peticion.json();
+
+    // ═══ CAMBIAR LA CONTRASEÑA DE UN CLIENTE ═══
+    // Las contraseñas no se pueden leer: la base solo guarda una huella que
+    // no se puede revertir. Cuando un cliente la olvida, lo único posible es
+    // ponerle una nueva.
+    if (accion === "clave") {
+      if (!correo || !clave || clave.length < 6) {
+        return responder({ error: "Falta el correo o la contraseña es muy corta." }, 400);
+      }
+
+      const conLlave = createClient(URL_BASE, CLAVE_MAESTRA);
+
+      // Se busca entre los usuarios porque la API pide el id, no el correo
+      const { data: lista, error: errorLista } = await conLlave.auth.admin.listUsers({
+        page: 1, perPage: 1000,
+      });
+      if (errorLista) return responder({ error: errorLista.message }, 500);
+
+      const usuario = lista.users.find(
+        (u) => (u.email ?? "").toLowerCase() === correo.trim().toLowerCase()
+      );
+      if (!usuario) {
+        return responder({ error: "No existe ningún usuario con ese correo." }, 400);
+      }
+
+      // Solo clientes: el administrador no se cambia la clave desde acá, para
+      // que un error no lo deje afuera de su propio panel.
+      const { data: perfil } = await conLlave
+        .from("perfiles").select("rol, boda_id").eq("id", usuario.id).maybeSingle();
+
+      if (perfil?.rol === "super") {
+        return responder({
+          error: "Esa es una cuenta de administrador. Cambiala desde Supabase.",
+        }, 400);
+      }
+
+      const { error: errorClave } = await conLlave.auth.admin.updateUserById(usuario.id, {
+        password: clave,
+      });
+      if (errorClave) return responder({ error: errorClave.message }, 400);
+
+      // La copia para poder reenviársela. Si esto falla, la contraseña nueva
+      // ya quedó puesta igual: no se deshace el cambio por no poder anotarlo.
+      await conLlave.from("accesos").upsert({
+        correo: (usuario.email ?? "").toLowerCase(),
+        boda_id: perfil?.boda_id ?? null,
+        clave,
+        actualizado: new Date().toISOString(),
+      });
+
+      return responder({ ok: true, correo: usuario.email });
+    }
 
     if (!correo || typeof correo !== "string" || !correo.includes("@")) {
       return responder({ error: "El correo no es válido." }, 400);
@@ -123,6 +175,14 @@ Deno.serve(async (peticion) => {
       await conLlaveMaestra.auth.admin.deleteUser(creado.user!.id);
       return responder({ error: "No se pudo asignar la boda: " + errorPerfil.message }, 500);
     }
+
+    // La copia del acceso, para poder reenviárselo si lo olvida
+    await conLlaveMaestra.from("accesos").upsert({
+      correo: correo.trim().toLowerCase(),
+      boda_id,
+      clave,
+      actualizado: new Date().toISOString(),
+    });
 
     return responder({
       ok: true,
