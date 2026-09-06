@@ -471,6 +471,44 @@
       }
 
       .vacio { padding: 2.5rem 1.25rem; text-align: center; color: var(--texto-tenue); }
+
+      /* Aviso de bodas que ya pasaron */
+      .aviso-terminadas {
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+        background: rgba(255, 196, 84, 0.1);
+        border: 1px solid rgba(255, 196, 84, 0.35);
+        border-left: 3px solid #ffc454;
+        border-radius: 12px;
+        padding: .9rem 1.1rem;
+        margin-bottom: 1rem;
+        font-size: .9rem;
+      }
+      .aviso-terminadas svg {
+        width: 19px;
+        height: 19px;
+        flex: none;
+        color: #ffc454;
+        margin-top: .1rem;
+      }
+      .aviso-terminadas strong { display: block; margin-bottom: .15rem; }
+      .aviso-terminadas span { color: var(--texto-tenue); }
+
+      .marca-terminada {
+        display: inline-block;
+        background: rgba(255, 196, 84, 0.14);
+        color: #ffc454;
+        border-radius: 999px;
+        padding: .12rem .6rem;
+        font-size: .74rem;
+        font-weight: 600;
+        white-space: nowrap;
+        margin-left: .5rem;
+      }
+      /* La fila se apaga un poco: ya no hay nada que hacer ahí */
+      tr.fila-terminada .celda-nombre,
+      tr.fila-terminada td { opacity: .72; }
       /* Casillas de funciones contratadas */
       .funciones-caja {
         display: flex;
@@ -1011,6 +1049,18 @@
           <div class="caja-num"><span>Confirmaron</span><strong id="global-confirmados">0</strong></div>
           <div class="caja-num"><span>Asistentes</span><strong id="global-asistentes">0</strong></div>
         </div>
+
+        <p id="aviso-terminadas" class="aviso-terminadas oculto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+            <path d="M12 9v4M12 17h.01" />
+          </svg>
+          <span>
+            <strong id="aviso-terminadas-titulo"></strong>
+            <span>Ya podés borrarlas para dejar el panel limpio. Al borrar una boda se
+            borran también sus invitados, así que descargá antes lo que quieras guardar.</span>
+          </span>
+        </p>
 
         <section class="tarjeta">
           <div class="tarjeta-cabecera">
@@ -1625,6 +1675,14 @@
         bodas = resBodas.data ?? [];
         const filas = resInv.data ?? [];
 
+        // Las que ya pasaron se van al final: arriba tiene que quedar lo que
+        // todavía hay que atender.
+        bodas.sort((a, b) => {
+          const ta = yaTermino(a), tb = yaTermino(b);
+          if (ta !== tb) return ta ? 1 : -1;
+          return (a.fecha ?? "9999").localeCompare(b.fecha ?? "9999");
+        });
+
         for (const b of bodas) {
           const suyos = filas.filter((i) => i.boda_id === b.id);
           b.total = suyos.length;
@@ -1645,6 +1703,23 @@
         pintarBodas();
       }
 
+      // Se considera terminada 2 días después de la fecha: el día de la boda
+      // y el siguiente todavía se usa el panel (control de puerta, cierres).
+      const DIAS_DE_GRACIA = 2;
+
+      /** Días completos desde la fecha de la boda. Null si no tiene fecha. */
+      function diasDesdeLaBoda(fecha) {
+        if (!fecha) return null;
+        // Mediodía para que el cambio de día no dependa de la zona horaria
+        const dia = new Date(fecha + "T12:00:00").getTime();
+        return Math.floor((Date.now() - dia) / 86400000);
+      }
+
+      const yaTermino = (b) => {
+        const d = diasDesdeLaBoda(b.fecha);
+        return d !== null && d > DIAS_DE_GRACIA;
+      };
+
       const NOMBRES_FN = {
         pases: "Pases",
         confirmacion: "Confirmación",
@@ -1655,6 +1730,15 @@
       function pintarBodas() {
         const cuerpo = $("lista-bodas");
         cuerpo.innerHTML = "";
+
+        const terminadas = bodas.filter(yaTermino);
+        ver($("aviso-terminadas"), terminadas.length > 0);
+        if (terminadas.length) {
+          $("aviso-terminadas-titulo").textContent =
+            terminadas.length === 1
+              ? "La boda de " + terminadas[0].nombre + " ya pasó"
+              : terminadas.length + " bodas ya pasaron";
+        }
 
         // Con muchas bodas hace falta buscar. Se filtra por nombre y también
         // por identificador, que es como aparecen en la base.
@@ -1680,6 +1764,19 @@
           tdNombre.dataset.rotulo = "Boda";
           tdNombre.className = "celda-nombre";
           tdNombre.textContent = b.nombre;
+
+          if (yaTermino(b)) {
+            fila.classList.add("fila-terminada");
+            const dias = diasDesdeLaBoda(b.fecha);
+            const marca = document.createElement("span");
+            marca.className = "marca-terminada";
+            marca.textContent =
+              dias < 30
+                ? "Terminada hace " + dias + " días"
+                : "Terminada hace " + Math.floor(dias / 30) + " meses";
+            tdNombre.append(marca);
+          }
+
           if (!b.registro_abierto) {
             const cerrado = document.createElement("span");
             cerrado.className = "marca-conf marca-pendiente";
