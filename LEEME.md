@@ -185,6 +185,11 @@ Debe dar HTTP 200 y devolver `[]`.
 
 ## 6. Conectar la invitación
 
+> **Para una boda nueva, con otro diseño:** está todo en
+> [GUIA-PARA-OTRA-TERMINAL-DE-CLAUDE.md](GUIA-PARA-OTRA-TERMINAL-DE-CLAUDE.md),
+> escrita para pasarle el trabajo a otra terminal de Claude Code.
+
+
 En el componente que muestra el pase, dentro del `<script>`:
 
 ```js
