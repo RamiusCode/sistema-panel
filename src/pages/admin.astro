@@ -826,11 +826,71 @@
       }
 
 
-      /* ── Filas del modal de acceso ── */
-      .fila-acceso {
-        grid-template-columns: 1fr auto;
-        align-items: start;
+      /* ── Ticket de acceso del cliente ── */
+      .ticket {
+        border: 1px solid var(--borde);
+        border-radius: 14px;
+        overflow: hidden;
+        background: var(--panel-alto);
       }
+      .ticket + .ticket { margin-top: .9rem; }
+
+      .ticket-cabecera {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: .7rem 1rem;
+        background: var(--neon-fondo);
+        border-bottom: 1px dashed var(--borde);
+      }
+      .ticket-cabecera strong {
+        font-size: .74rem;
+        text-transform: uppercase;
+        letter-spacing: .14em;
+        color: var(--neon);
+      }
+      .ticket-cabecera span { font-size: .78rem; color: var(--texto-tenue); }
+
+      .ticket-dato {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: .75rem;
+        padding: .65rem 1rem;
+      }
+      .ticket-dato + .ticket-dato { border-top: 1px solid var(--borde-suave); }
+      .ticket-dato .rotulo {
+        display: block;
+        font-size: .7rem;
+        text-transform: uppercase;
+        letter-spacing: .1em;
+        color: var(--texto-tenue);
+        margin-bottom: .12rem;
+      }
+      .ticket-dato .valor {
+        display: block;
+        font-size: .92rem;
+        word-break: break-all;
+        line-height: 1.35;
+      }
+      .ticket-dato .valor.clave {
+        color: var(--neon);
+        font-weight: 600;
+        letter-spacing: .05em;
+      }
+      .ticket-dato .valor.falta { color: var(--texto-tenue); font-weight: 400; }
+
+      .ticket-pie {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        padding: .75rem 1rem;
+        border-top: 1px dashed var(--borde);
+      }
+      .ticket-pie .btn { flex: 1 1 auto; justify-content: center; }
+
+      /* ── Filas del modal de acceso ── */
       .cambio-clave {
         grid-column: 1 / -1;
         display: flex;
@@ -901,8 +961,8 @@
 
         /* Campos de funciones y de acceso, apilados */
         .fn-card { grid-template-columns: 26px 1fr 20px; padding: .6rem .7rem; }
-        .fila-acceso { grid-template-columns: 1fr; }
-        .fila-acceso .acciones { margin-top: .5rem; }
+        .ticket-dato { grid-template-columns: 1fr; gap: .5rem; }
+        .ticket-dato .btn { justify-self: start; }
 
         /* El aviso de bodas terminadas */
         .aviso-terminadas { padding: .8rem .9rem; font-size: .86rem; }
@@ -3587,46 +3647,70 @@
           return;
         }
 
+        const link = window.location.origin + "/admin";
+
         for (const cl of clientes) {
-          const fila = document.createElement("div");
-          fila.className = "fn-card";
-          fila.style.cursor = "default";
-
-          const cuando = cl.ultimo_ingreso
-            ? "Entró por última vez el " +
-              new Date(cl.ultimo_ingreso).toLocaleDateString("es-BO")
-            : "Todavía no entró nunca";
-
           const guardada = claves[(cl.correo || "").toLowerCase()];
 
-          const texto = document.createElement("span");
-          texto.className = "fn-texto";
-          texto.innerHTML =
-            "<strong>" + cl.correo + "</strong>" +
-            (guardada
-              ? '<span style="display:block;margin:.25rem 0;font-size:.86rem">' +
-                'Contraseña: <strong style="color:var(--neon);letter-spacing:.04em">' +
-                guardada + "</strong></span>"
-              : '<span style="display:block;margin:.25rem 0;font-size:.8rem;color:var(--texto-tenue)">' +
-                "Sin contraseña guardada — generá una nueva</span>") +
-            '<span style="display:block;font-size:.78rem;color:var(--texto-tenue)">' +
-            cuando + "</span>";
+          const ticket = document.createElement("div");
+          ticket.className = "ticket";
 
-          const acciones = document.createElement("div");
-          acciones.className = "acciones";
-          acciones.style.flexWrap = "wrap";
+          // ── Cabecera ──
+          const cab = document.createElement("div");
+          cab.className = "ticket-cabecera";
+          const titulo = document.createElement("strong");
+          titulo.textContent = "Acceso al panel";
+          const cuando = document.createElement("span");
+          cuando.textContent = cl.ultimo_ingreso
+            ? "Entró el " + new Date(cl.ultimo_ingreso).toLocaleDateString("es-BO")
+            : "Todavía no entró";
+          cab.append(titulo, cuando);
+          ticket.append(cab);
+
+          // ── Un dato con su botón de copiar ──
+          const dato = (rotulo, valor, clase) => {
+            const fila = document.createElement("div");
+            fila.className = "ticket-dato";
+
+            const texto = document.createElement("div");
+            texto.innerHTML =
+              '<span class="rotulo"></span><span class="valor"></span>';
+            texto.querySelector(".rotulo").textContent = rotulo;
+            const v = texto.querySelector(".valor");
+            v.textContent = valor;
+            if (clase) v.classList.add(clase);
+
+            fila.append(texto);
+            if (clase !== "falta") {
+              fila.append(boton("Copiar", "btn-linea", () => copiar(valor, rotulo + " copiado")));
+            }
+            return fila;
+          };
+
+          ticket.append(dato("Link", link));
+          ticket.append(dato("Correo", cl.correo));
+          ticket.append(
+            guardada
+              ? dato("Contraseña", guardada, "clave")
+              : dato("Contraseña", "Sin guardar — poné una nueva", "falta")
+          );
+
+          // ── Acciones ──
+          const pie = document.createElement("div");
+          pie.className = "ticket-pie";
 
           if (guardada) {
-            acciones.append(
-              boton("Copiar mensaje", "btn-neon", () =>
+            pie.append(
+              boton("Copiar mensaje completo", "btn-neon", () =>
                 copiar(mensajeParaCliente(cl.correo, guardada, bodaDelAcceso?.nombre))
               )
             );
           }
 
-          // ── Cambiar la contraseña: escrita a mano o generada ──
+          // ── Cambiar la contraseña, escrita a mano o generada ──
           const cambio = document.createElement("div");
           cambio.className = "oculto cambio-clave";
+          cambio.style.width = "100%";
 
           const campo = document.createElement("input");
           campo.type = "text";
@@ -3634,11 +3718,6 @@
           campo.minLength = 6;
           campo.autocomplete = "off";
           campo.placeholder = "Contraseña nueva";
-
-          const btnOtra = boton("Generar", "btn-linea", () => {
-            campo.value = claveFacil();
-            campo.focus();
-          });
 
           const btnGuardar = boton("Guardar", "btn-neon", () => {
             const nueva = campo.value.trim();
@@ -3650,30 +3729,30 @@
             cambiarClave(cl.correo, nueva, btnGuardar);
           });
 
-          // Enter guarda: es un campo solo, no hace falta ir hasta el botón
           campo.addEventListener("keydown", (e) => {
             if (e.key === "Enter") { e.preventDefault(); btnGuardar.click(); }
           });
 
-          cambio.append(campo, btnOtra, btnGuardar);
+          cambio.append(
+            campo,
+            boton("Generar", "btn-linea", () => { campo.value = claveFacil(); campo.focus(); }),
+            btnGuardar
+          );
 
-          const btnAbrir = boton(
-            guardada ? "Cambiar contraseña" : "Poner contraseña",
-            "btn-linea",
-            () => {
+          pie.append(
+            boton(guardada ? "Cambiar contraseña" : "Poner contraseña", "btn-linea", () => {
               const abriendo = cambio.classList.contains("oculto");
               ver(cambio, abriendo);
               if (abriendo) {
-                campo.value = claveFacil();   // viene una sugerida, se puede borrar
+                campo.value = claveFacil();
                 campo.focus();
                 campo.select();
               }
-            }
+            })
           );
-          acciones.append(btnAbrir);
 
-          // Borrar el acceso. Pide confirmar en el mismo botón: un modal
-          // arriba de otro se vuelve un laberinto, y esto no borra invitados.
+          // Borrar el acceso. Confirma en el mismo botón: un modal arriba de
+          // otro se vuelve un laberinto, y esto no borra invitados.
           let confirmando = false;
           const btnBorrar = boton("Quitar acceso", "btn-peligro", () => {
             if (!confirmando) {
@@ -3687,12 +3766,12 @@
             }
             borrarCliente(cl.correo, btnBorrar);
           });
-          acciones.append(btnBorrar);
+          pie.append(btnBorrar);
 
-          fila.classList.add("fila-acceso");
-          fila.append(texto, acciones, cambio);
-          caja.append(fila);
+          ticket.append(pie, cambio);
+          caja.append(ticket);
         }
+
         ver($("acceso-nota"), true);
       }
 
