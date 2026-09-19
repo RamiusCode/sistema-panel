@@ -1661,23 +1661,20 @@
     <!-- ═══ MODAL INVITADO AGREGADO ═══
          El aviso flotante dura dos segundos y en el celular pasa desapercibido:
          el cliente agregaba un invitado y se quedaba sin saber si se guardó.
-         Esta ventana lo confirma sin lugar a dudas, y de paso deja el link a
-         mano para mandarlo en el momento. -->
+         Esta ventana solo confirma eso. El link no se repite acá a propósito:
+         ya está en la lista, y tenerlo en dos lugares confunde más que ayuda. -->
     <div id="modal-agregado" class="modal-fondo oculto">
       <div class="modal">
         <div class="modal-cabecera">Invitado agregado</div>
         <div class="modal-cuerpo">
           <p id="agregado-nombre" style="margin:0; font-size:1.05rem; font-weight:600"></p>
           <p id="agregado-pases" class="ayuda" style="margin:.25rem 0 0"></p>
-          <p class="ayuda" style="margin:.9rem 0 .35rem">Su link personal:</p>
-          <pre id="agregado-link" style="white-space:pre-wrap; word-break:break-all;
-            background:var(--fondo); border:1px solid var(--borde); border-radius:10px;
-            padding:.75rem .9rem; font-size:.8rem; line-height:1.5; margin:0"></pre>
+          <p class="ayuda" style="margin:.9rem 0 0">
+            Ya aparece primero en la lista de abajo, con su link para compartir.
+          </p>
         </div>
         <div class="modal-pie">
-          <button type="button" class="btn btn-linea" id="btn-cerrar-agregado" data-cerrar-modal>Cerrar</button>
-          <button type="button" class="btn btn-linea" id="btn-copiar-agregado-link">Copiar link</button>
-          <button type="button" class="btn btn-neon" id="btn-copiar-agregado-mensaje">Copiar mensaje</button>
+          <button type="button" class="btn btn-neon" id="btn-cerrar-agregado" data-cerrar-modal>Listo</button>
         </div>
       </div>
     </div>
@@ -2874,14 +2871,10 @@
        * Confirma en grande que el invitado quedó guardado.
        *
        * El aviso flotante de dos segundos era fácil de no ver, sobre todo en
-       * el celular: el cliente no sabía si había que volver a apretar. Ahora
-       * la confirmación tapa la pantalla, y ya trae el link para mandárselo
-       * sin tener que buscarlo en la lista.
+       * el celular: el cliente no sabía si había que volver a apretar Agregar.
+       * Esta ventana dice una sola cosa, que es la que hacía falta.
        */
-      let ultimoAgregado = null;
-
       function mostrarAgregado(inv) {
-        ultimoAgregado = inv;
         $("agregado-nombre").textContent = inv.nombre;
 
         // Los pases solo se nombran si esta boda los tiene contratados; si no,
@@ -2889,21 +2882,12 @@
         $("agregado-pases").textContent = tiene("pases") ? frasePases(inv.pases) : "";
         ver($("agregado-pases"), tiene("pases"));
 
-        $("agregado-link").textContent = linkDeInvitado(inv.codigo);
         ver($("modal-agregado"), true);
       }
 
       // Al cerrar, el foco vuelve al nombre: lo normal es cargar varios
       // invitados seguidos, uno atrás de otro.
       $("btn-cerrar-agregado").addEventListener("click", () => $("in-nombre").focus());
-
-      $("btn-copiar-agregado-link").addEventListener("click", () => {
-        if (ultimoAgregado) copiar(linkDeInvitado(ultimoAgregado.codigo), "Link copiado");
-      });
-
-      $("btn-copiar-agregado-mensaje").addEventListener("click", () => {
-        if (ultimoAgregado) copiar(mensajeInvitacion(ultimoAgregado));
-      });
 
       // ── Modales ──
       for (const btn of document.querySelectorAll("[data-cerrar-modal]")) {
