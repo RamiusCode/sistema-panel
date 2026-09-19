@@ -1921,12 +1921,148 @@
       });
 
       async function salir() {
+        // Esta salida es a propósito: que el vigilante del acceso no la
+        // confunda con un acceso cerrado y muestre un aviso que no viene.
+        cerrandoSesion = true;
+        pararRelojDeAcceso();
         soltarCanal();
         await supabase.auth.signOut();
         location.reload();
       }
       $("btn-salir").addEventListener("click", salir);
       $("btn-salir-super").addEventListener("click", salir);
+
+      // ═══════════════════════════════════════════════════════════════════
+      //  VIGILAR QUE EL ACCESO SIGA EN PIE
+      //
+      //  Cuando se le quita el acceso a un cliente, su usuario se borra de la
+      //  base en el momento. Pero el pase que su navegador ya tiene guardado
+      //  sigue valiendo hasta una hora más: no se le pregunta al servidor en
+      //  cada pedido, se comprueba por la firma. Sin esto, el cliente se queda
+      //  con el panel abierto delante, sin poder tocar nada y sin entender por
+      //  qué.
+      //
+      //  Así que cada tanto se le pregunta al servidor si su usuario sigue
+      //  existiendo, y cuando ya no, se lo manda al login.
+      //
+      //  ⚠️ SOLO SE SACA A ALGUIEN CUANDO EL SERVIDOR LO DICE
+      //  Quedarse sin internet, el wifi del salón cayéndose o Supabase
+      //  tardando NO cierran la sesión: ahí no se hace nada y se lo deja
+      //  trabajar. Echar a un cliente en plena boda por una mala señal sería
+      //  peor que el problema que esto arregla.
+      // ═══════════════════════════════════════════════════════════════════
+
+      const CADA_CUANTO_REVISAR = 2 * 60 * 1000;
+
+      const AVISO_SIN_ACCESO =
+        "Tu acceso ya no está activo. Volvé a entrar, o pedile al administrador uno nuevo.";
+
+      let relojDeAcceso = null;
+      let revisandoAcceso = false;
+      let cerrandoSesion = false;
+
+      /**
+       * ¿El servidor está diciendo que este usuario ya no existe?
+       *
+       * Solo cuentan estas respuestas suyas, y ninguna más. Sin internet, el
+       * servidor caído, una respuesta a medias o demasiados pedidos seguidos
+       * caen fuera de la lista a propósito: eso es "no se sabe", y con un "no
+       * se sabe" no se saca a nadie.
+       */
+      function diceQueNoExiste(error) {
+        if (!error) return false;
+        if (error.name === "AuthRetryableFetchError") return false;
+        // La sesión ya no está ni en este navegador: no hay nada que vigilar.
+        if (error.name === "AuthSessionMissingError") return true;
+        return error.status === 401 || error.status === 403 || error.status === 404;
+      }
+
+      /**
+       * Le pregunta al SERVIDOR —no a la sesión guardada en el navegador— si
+       * este usuario sigue existiendo.
+       *   "vale"       → sigue teniendo acceso
+       *   "cerrado"    → el servidor dice que ya no
+       *   "no se sabe" → no se pudo preguntar; no es motivo para sacar a nadie
+       */
+      async function comprobarUsuario() {
+        try {
+          const { data, error } = await supabase.auth.getUser();
+          if (error) return diceQueNoExiste(error) ? "cerrado" : "no se sabe";
+          return data?.user ? "vale" : "cerrado";
+        } catch {
+          return "no se sabe";
+        }
+      }
+
+      /** Cierra la sesión y deja al cliente en el login, con el motivo escrito. */
+      async function sacarAlLogin(motivo) {
+        if (cerrandoSesion) return;
+        cerrandoSesion = true;
+
+        pararRelojDeAcceso();
+        soltarCanal();
+        cerrarModales();
+
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Si el usuario ya no existe, el servidor se queja. Da igual: lo que
+          // importa es que la sesión de este navegador quede cerrada.
+        }
+
+        // Se limpia lo que había a la vista para que no quede nada de la boda
+        // anterior si después entra otra persona en la misma ventana.
+        esSuper = false;
+        miBodaId = null;
+        bodaActual = null;
+        invitados = [];
+
+        $("login-pass").value = "";
+        pantalla("pantalla-login");
+        mostrarError("login-error", motivo);
+
+        cerrandoSesion = false;
+      }
+
+      async function revisarAcceso() {
+        if (DEMO || !supabase || revisandoAcceso || cerrandoSesion) return;
+        // En el login no hay ninguna sesión que vigilar.
+        if (!$("pantalla-login").classList.contains("oculto")) return;
+
+        revisandoAcceso = true;
+        try {
+          if ((await comprobarUsuario()) === "cerrado") await sacarAlLogin(AVISO_SIN_ACCESO);
+        } finally {
+          revisandoAcceso = false;
+        }
+      }
+
+      function arrancarRelojDeAcceso() {
+        if (DEMO || !supabase || relojDeAcceso) return;
+        relojDeAcceso = setInterval(revisarAcceso, CADA_CUANTO_REVISAR);
+      }
+
+      function pararRelojDeAcceso() {
+        clearInterval(relojDeAcceso);
+        relojDeAcceso = null;
+      }
+
+      // Al volver a la pestaña se revisa en el acto: el navegador congela los
+      // relojes de las pestañas de fondo, así que el de arriba puede haber
+      // estado dormido un buen rato.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") revisarAcceso();
+      });
+
+      // Cuando la librería no logra renovar el pase, borra la sesión sola y
+      // avisa por acá. Sin escuchar esto, el panel se quedaría dibujado en
+      // pantalla como si nada, con datos que ya no se pueden tocar.
+      supabase?.auth.onAuthStateChange((evento) => {
+        if (evento !== "SIGNED_OUT" || cerrandoSesion) return;
+        // Si ya está en el login, no hay nada que hacer.
+        if (!$("pantalla-login").classList.contains("oculto")) return;
+        sacarAlLogin(AVISO_SIN_ACCESO);
+      });
 
       // ═══ ENTRADA ═══
       async function entrar() {
@@ -1935,6 +2071,9 @@
           pantalla("pantalla-login");
           return;
         }
+
+        // Desde acá hay sesión abierta: se la vigila hasta que se cierre.
+        arrancarRelojDeAcceso();
 
         const { data: perfil } = await supabase
           .from("perfiles").select("rol, boda_id").eq("id", session.user.id).maybeSingle();
@@ -1956,6 +2095,15 @@
         // Un cliente sin boda asignada todavía: mejor decirlo que dejarlo
         // mirando una pantalla vacía sin entender por qué.
         if (!miBodaId) {
+          // Sin perfil hay dos casos distintos, y se parecen: un cliente
+          // recién creado al que todavía no se le asignó su boda, o uno al
+          // que le quitaron el acceso y su navegador guarda el pase viejo.
+          // Se le pregunta al servidor cuál de los dos es.
+          if (!perfil && (await comprobarUsuario()) === "cerrado") {
+            await sacarAlLogin(AVISO_SIN_ACCESO);
+            return;
+          }
+
           pantalla("pantalla-carga");
           fallo(
             "Tu cuenta todavía no tiene una boda asignada",
