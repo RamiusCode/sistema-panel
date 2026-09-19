@@ -34,6 +34,8 @@
         --neon-brillo:   rgba(0, 245, 160, 0.35);
         --peligro:       #ff4d6d;
         --peligro-fondo: rgba(255, 77, 109, 0.12);
+        --dato:          #4cc2ff;
+        --dato-fondo:    rgba(76, 194, 255, 0.12);
         --sombra:        0 4px 20px rgba(0, 0, 0, 0.55);
         --radio:         9px;
 
@@ -151,6 +153,18 @@
 
       .btn-peligro    { border: 1px solid rgba(255,77,109,.4); color: var(--peligro); }
       .btn-peligro:hover { background: var(--peligro-fondo); border-color: var(--peligro); }
+
+      /* Los de Excel van en celeste: estaban del mismo gris que las pestañas
+         de filtro, justo encima, y se confundían con ellas. */
+      .btn-dato {
+        border: 1px solid rgba(76, 194, 255, .45);
+        background: var(--dato-fondo);
+        color: var(--dato);
+      }
+      .btn-dato:hover:not(:disabled) {
+        border-color: var(--dato);
+        background: rgba(76, 194, 255, .2);
+      }
 
       .btn-chico { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
 
@@ -1360,11 +1374,11 @@
             <div class="tarjeta-cabecera">
               <span class="tarjeta-titulo">Lista de invitados</span>
               <div class="barra-acciones">
-                <input id="buscador" type="search" class="campo" placeholder="Buscar…" />
-                <button id="btn-subir-excel" class="btn btn-linea btn-chico" type="button">
+                <input id="buscador" type="search" class="campo" placeholder="Buscar invitado…" />
+                <button id="btn-subir-excel" class="btn btn-dato btn-chico" type="button">
                   Subir Excel
                 </button>
-                <button id="btn-excel" class="btn btn-linea btn-chico" type="button">
+                <button id="btn-excel" class="btn btn-dato btn-chico" type="button">
                   Descargar Excel
                 </button>
                 <input id="archivo-excel" type="file" class="oculto"
