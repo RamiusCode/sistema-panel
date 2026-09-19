@@ -686,8 +686,9 @@
         from { opacity: 0; transform: translateY(14px) scale(.92); }
       }
 
-      /* El tilde se dibuja solo: primero el círculo, después la marca. */
-      .alerta-tilde {
+      /* La marca se dibuja sola: primero el círculo, después el tilde (o la
+         equis, cuando lo que se avisa es un borrado). */
+      .alerta-marca {
         width: 72px;
         height: 72px;
         margin: 0 auto .9rem;
@@ -699,19 +700,36 @@
         stroke-linejoin: round;
         filter: drop-shadow(0 0 10px var(--neon-brillo));
       }
-      .alerta-tilde circle {
+      .alerta-marca circle {
         stroke-dasharray: 145;
-        animation: alerta-trazo .5s ease-out forwards;
+        animation: alerta-trazo-circulo .5s ease-out forwards;
         opacity: .55;
       }
-      .alerta-tilde path {
-        stroke-dasharray: 40;
-        animation: alerta-trazo .32s .34s ease-out backwards;
+      .alerta-marca path {
+        stroke-dasharray: 60;
+        animation: alerta-trazo-marca .34s .34s ease-out backwards;
       }
-      @keyframes alerta-trazo {
+      @keyframes alerta-trazo-circulo {
         from { stroke-dashoffset: 145; }
         to   { stroke-dashoffset: 0; }
       }
+      @keyframes alerta-trazo-marca {
+        from { stroke-dashoffset: 60; }
+        to   { stroke-dashoffset: 0; }
+      }
+
+      /* Borrar es lo único de acá que no se puede deshacer: va en rojo y con
+         una equis, para que no se confunda con un "guardado" de un vistazo. */
+      .alerta .marca-equis { display: none; }
+      .alerta.borrado .marca-tilde { display: none; }
+      .alerta.borrado .marca-equis { display: block; }
+      .alerta.borrado .alerta-marca {
+        stroke: var(--peligro);
+        filter: drop-shadow(0 0 10px rgba(255, 77, 109, .4));
+      }
+      .alerta.borrado .alerta-titulo { color: var(--peligro); }
+      .alerta.borrado .alerta-barra i { background: var(--peligro); }
+      .alerta.borrado { box-shadow: 0 24px 60px rgba(0,0,0,.65), 0 0 0 1px var(--peligro-fondo); }
 
       .alerta-titulo {
         font-size: 1.12rem;
@@ -753,7 +771,7 @@
       /* Quien pidió menos movimiento igual tiene que ver el aviso: se muestra
          entero, sin dibujarse. */
       @media (prefers-reduced-motion: reduce) {
-        .alerta-fondo, .alerta, .alerta-tilde circle, .alerta-tilde path {
+        .alerta-fondo, .alerta, .alerta-marca circle, .alerta-marca path {
           animation: none;
         }
       }
@@ -1846,15 +1864,16 @@
 
          El link no se repite acá a propósito: ya está en la fila del invitado,
          que queda primera en la lista. -->
-    <div id="alerta-agregado" class="alerta-fondo oculto" role="status" aria-live="polite">
-      <div class="alerta">
-        <svg class="alerta-tilde" viewBox="0 0 52 52" aria-hidden="true">
+    <div id="alerta" class="alerta-fondo oculto" role="status" aria-live="polite">
+      <div id="alerta-caja" class="alerta">
+        <svg class="alerta-marca" viewBox="0 0 52 52" aria-hidden="true">
           <circle cx="26" cy="26" r="23" />
-          <path d="M15 27.5 L22.5 35 L37.5 19" />
+          <path class="marca-tilde" d="M15 27.5 L22.5 35 L37.5 19" />
+          <path class="marca-equis" d="M18 18 L34 34 M34 18 L18 34" />
         </svg>
-        <p class="alerta-titulo">Invitado agregado</p>
+        <p id="alerta-titulo" class="alerta-titulo"></p>
         <p id="alerta-nombre" class="alerta-nombre"></p>
-        <p id="alerta-pases" class="alerta-detalle"></p>
+        <p id="alerta-detalle" class="alerta-detalle"></p>
         <div class="alerta-barra"><i></i></div>
       </div>
     </div>
@@ -3096,22 +3115,30 @@
        */
       const DURACION_ALERTA = 2000;
       let relojAlerta = null;
+      let volverAlNombre = false;
 
-      function mostrarAgregado(inv) {
-        $("alerta-nombre").textContent = inv.nombre;
+      /**
+       * El aviso grande, el mismo para agregar, editar y borrar.
+       * tono: "ok" (verde, con tilde) o "borrado" (rojo, con equis).
+       */
+      function mostrarAlerta(titulo, nombre = "", detalle = "", tono = "ok") {
+        $("alerta-titulo").textContent = titulo;
 
-        // Los pases solo se nombran si esta boda los tiene contratados; si no,
-        // hablar de pases confundiría al cliente con algo que no compró.
-        $("alerta-pases").textContent = tiene("pases") ? frasePases(inv.pases) : "";
-        ver($("alerta-pases"), tiene("pases"));
+        $("alerta-nombre").textContent = nombre;
+        ver($("alerta-nombre"), Boolean(nombre));
+
+        $("alerta-detalle").textContent = detalle;
+        ver($("alerta-detalle"), Boolean(detalle));
+
+        $("alerta-caja").classList.toggle("borrado", tono === "borrado");
 
         // La barrita de abajo se vacía en este mismo tiempo. Se lo pasa el
         // script para que no queden dos números distintos que mantener.
-        const alerta = $("alerta-agregado");
+        const alerta = $("alerta");
         alerta.style.setProperty("--duracion", DURACION_ALERTA + "ms");
 
         // Si venía una alerta anterior, se reinicia el dibujo: sin esto, al
-        // cargar invitados rápido el tilde no se vuelve a dibujar.
+        // cargar invitados rápido la marca no se vuelve a dibujar.
         ver(alerta, false);
         void alerta.offsetWidth;
         ver(alerta, true);
@@ -3120,18 +3147,33 @@
         relojAlerta = setTimeout(cerrarAlerta, DURACION_ALERTA);
       }
 
+      /** Al agregar, además, el foco vuelve al nombre para seguir cargando. */
+      function mostrarAgregado(inv) {
+        volverAlNombre = true;
+        mostrarAlerta(
+          "Invitado agregado",
+          inv.nombre,
+          // Los pases solo se nombran si esta boda los tiene contratados; si
+          // no, hablar de pases lo confundiría con algo que no compró.
+          tiene("pases") ? frasePases(inv.pases) : ""
+        );
+      }
+
       function cerrarAlerta() {
         clearTimeout(relojAlerta);
         relojAlerta = null;
-        if ($("alerta-agregado").classList.contains("oculto")) return;
-        ver($("alerta-agregado"), false);
-        // El foco vuelve al nombre: lo normal es cargar varios invitados
-        // seguidos, uno atrás de otro.
-        $("in-nombre")?.focus();
+        if ($("alerta").classList.contains("oculto")) return;
+        ver($("alerta"), false);
+
+        // Solo después de agregar: lo normal es cargar varios invitados
+        // seguidos. Al borrar o editar, mandar el foco al formulario abriría
+        // el teclado del celular sin que nadie lo haya pedido.
+        if (volverAlNombre) $("in-nombre")?.focus();
+        volverAlNombre = false;
       }
 
       // Tocarla la cierra antes de tiempo, para quien no quiere esperar.
-      $("alerta-agregado").addEventListener("click", cerrarAlerta);
+      $("alerta").addEventListener("click", cerrarAlerta);
 
       // ── Modales ──
       for (const btn of document.querySelectorAll("[data-cerrar-modal]")) {
@@ -3249,9 +3291,11 @@
         }
 
         Object.assign(enEdicion, parche);
+        // El nombre se guarda antes: cerrarModales() suelta al invitado en edición.
+        const nombreEditado = enEdicion.nombre;
         cerrarModales();
         pintarLista();
-        avisar("Actualizado — el link sigue sirviendo");
+        mostrarAlerta("Cambios guardados", nombreEditado, "El link sigue sirviendo");
       });
 
       function abrirBorrar(inv) {
@@ -3271,10 +3315,11 @@
           return;
         }
 
+        const nombreBorrado = enBorrado.nombre;
         invitados = invitados.filter((x) => x.id !== enBorrado.id);
         cerrarModales();
         pintarLista();
-        avisar("Invitado borrado");
+        mostrarAlerta("Invitado borrado", nombreBorrado, "", "borrado");
       });
 
       // ── Compartir ──
