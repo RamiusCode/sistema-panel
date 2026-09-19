@@ -74,6 +74,43 @@
       }
       .campo::placeholder { color: #56637a; }
 
+      /* ── Ojo para ver la contraseña ──
+         En el celular la contraseña se escribe a ciegas, y una letra de más
+         deja al cliente afuera sin saber por qué. */
+      .campo-con-ojo { position: relative; }
+      .campo-con-ojo .campo { padding-right: 2.9rem; }
+      .ojo {
+        position: absolute;
+        top: 50%;
+        right: 0.4rem;
+        transform: translateY(-50%);
+        display: grid;
+        place-items: center;
+        width: 2.1rem;
+        height: 2.1rem;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--texto-tenue);
+        cursor: pointer;
+        transition: color .15s;
+      }
+      .ojo:hover { color: var(--texto); }
+      .ojo.viendo { color: var(--neon); }
+      .ojo svg {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      /* La rayita que cruza el ojo aparece recién cuando la clave está a la
+         vista: así se entiende que tocarlo la vuelve a tapar. */
+      .ojo .tachado { display: none; }
+      .ojo.viendo .tachado { display: block; }
+
       .etiqueta {
         display: block;
         font-size: 0.78rem;
@@ -599,6 +636,114 @@
         .celda-link { max-width: 100%; white-space: normal; word-break: break-all; }
       }
 
+      /* ── Alerta de "listo", la que se cierra sola ──
+         Se muestra tapando la pantalla para que no pase desapercibida, pero
+         no pide que se apriete nada: se va sola a los dos segundos. La
+         duración la pone el script en --duracion, para que la barrita y el
+         reloj que la cierra no se vayan separando con el tiempo. */
+      .alerta-fondo {
+        position: fixed;
+        inset: 0;
+        z-index: 70;              /* por encima de los modales */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        background: rgba(3, 6, 10, 0.72);
+        animation: alerta-entra-fondo 0.18s ease-out;
+      }
+      .alerta {
+        position: relative;
+        width: 100%;
+        max-width: 330px;
+        overflow: hidden;
+        text-align: center;
+        padding: 1.9rem 1.5rem 1.6rem;
+        background: var(--panel);
+        border: 1px solid var(--borde);
+        border-radius: 18px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, .65), 0 0 0 1px var(--neon-fondo);
+        animation: alerta-entra 0.32s cubic-bezier(.2, .9, .3, 1.2);
+      }
+      @keyframes alerta-entra-fondo {
+        from { opacity: 0; }
+      }
+      @keyframes alerta-entra {
+        from { opacity: 0; transform: translateY(14px) scale(.92); }
+      }
+
+      /* El tilde se dibuja solo: primero el círculo, después la marca. */
+      .alerta-tilde {
+        width: 72px;
+        height: 72px;
+        margin: 0 auto .9rem;
+        display: block;
+        fill: none;
+        stroke: var(--neon);
+        stroke-width: 3.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 10px var(--neon-brillo));
+      }
+      .alerta-tilde circle {
+        stroke-dasharray: 145;
+        animation: alerta-trazo .5s ease-out forwards;
+        opacity: .55;
+      }
+      .alerta-tilde path {
+        stroke-dasharray: 40;
+        animation: alerta-trazo .32s .34s ease-out backwards;
+      }
+      @keyframes alerta-trazo {
+        from { stroke-dashoffset: 145; }
+        to   { stroke-dashoffset: 0; }
+      }
+
+      .alerta-titulo {
+        font-size: 1.12rem;
+        font-weight: 700;
+        color: var(--neon);
+        letter-spacing: .01em;
+      }
+      .alerta-nombre {
+        margin-top: .45rem;
+        font-size: 1rem;
+        color: var(--texto);
+        word-break: break-word;
+      }
+      .alerta-detalle {
+        margin-top: .2rem;
+        font-size: .85rem;
+        color: var(--texto-tenue);
+      }
+
+      /* Barrita que se vacía: se ve cuánto le queda antes de cerrarse sola. */
+      .alerta-barra {
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        height: 3px;
+        background: var(--borde-suave);
+      }
+      .alerta-barra i {
+        display: block;
+        height: 100%;
+        background: var(--neon);
+        transform-origin: left;
+        animation: alerta-cuenta var(--duracion, 2000ms) linear forwards;
+      }
+      @keyframes alerta-cuenta {
+        from { transform: scaleX(1); }
+        to   { transform: scaleX(0); }
+      }
+
+      /* Quien pidió menos movimiento igual tiene que ver el aviso: se muestra
+         entero, sin dibujarse. */
+      @media (prefers-reduced-motion: reduce) {
+        .alerta-fondo, .alerta, .alerta-tilde circle, .alerta-tilde path {
+          animation: none;
+        }
+      }
+
       /* ── Ventanas modales ── */
       /* align-items:center recorta el modal por arriba cuando es más alto que
          la pantalla, y entonces no hay forma de llegar a la cabecera ni a los
@@ -1063,7 +1208,17 @@
           </div>
           <div>
             <label class="etiqueta" for="login-pass">Contraseña</label>
-            <input id="login-pass" type="password" class="campo" required autocomplete="current-password" />
+            <div class="campo-con-ojo">
+              <input id="login-pass" type="password" class="campo" required autocomplete="current-password" />
+              <button type="button" id="btn-ver-clave" class="ojo"
+                      aria-label="Mostrar la contraseña" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="3" />
+                  <path class="tachado" d="M4 20 L20 4" />
+                </svg>
+              </button>
+            </div>
           </div>
           <p id="login-error" class="aviso aviso-error oculto"></p>
           <button type="submit" id="btn-login" class="btn btn-neon" style="width: 100%">
@@ -1658,24 +1813,25 @@
       </div>
     </div>
 
-    <!-- ═══ MODAL INVITADO AGREGADO ═══
-         El aviso flotante dura dos segundos y en el celular pasa desapercibido:
-         el cliente agregaba un invitado y se quedaba sin saber si se guardó.
-         Esta ventana solo confirma eso. El link no se repite acá a propósito:
-         ya está en la lista, y tenerlo en dos lugares confunde más que ayuda. -->
-    <div id="modal-agregado" class="modal-fondo oculto">
-      <div class="modal">
-        <div class="modal-cabecera">Invitado agregado</div>
-        <div class="modal-cuerpo">
-          <p id="agregado-nombre" style="margin:0; font-size:1.05rem; font-weight:600"></p>
-          <p id="agregado-pases" class="ayuda" style="margin:.25rem 0 0"></p>
-          <p class="ayuda" style="margin:.9rem 0 0">
-            Ya aparece primero en la lista de abajo, con su link para compartir.
-          </p>
-        </div>
-        <div class="modal-pie">
-          <button type="button" class="btn btn-neon" id="btn-cerrar-agregado" data-cerrar-modal>Listo</button>
-        </div>
+    <!-- ═══ ALERTA: INVITADO AGREGADO ═══
+         El aviso flotante de abajo dura dos segundos y en el celular pasa
+         desapercibido: el cliente agregaba un invitado y se quedaba sin saber
+         si se había guardado. Esta se planta en el medio de la pantalla, se
+         cierra sola y no pide que nadie apriete nada, para no cortar la carga
+         de invitados uno atrás de otro.
+
+         El link no se repite acá a propósito: ya está en la fila del invitado,
+         que queda primera en la lista. -->
+    <div id="alerta-agregado" class="alerta-fondo oculto" role="status" aria-live="polite">
+      <div class="alerta">
+        <svg class="alerta-tilde" viewBox="0 0 52 52" aria-hidden="true">
+          <circle cx="26" cy="26" r="23" />
+          <path d="M15 27.5 L22.5 35 L37.5 19" />
+        </svg>
+        <p class="alerta-titulo">Invitado agregado</p>
+        <p id="alerta-nombre" class="alerta-nombre"></p>
+        <p id="alerta-pases" class="alerta-detalle"></p>
+        <div class="alerta-barra"><i></i></div>
       </div>
     </div>
 
@@ -1888,6 +2044,21 @@
         ver(el, Boolean(mensaje));
       }
 
+      /**
+       * Borra todos los avisos rojos que hayan quedado a la vista.
+       *
+       * El panel no recarga la página al entrar y al salir: cambia de pantalla
+       * y nada más. Sin esto, al cliente al que le quitaron el acceso —y se lo
+       * devolvieron— le seguía apareciendo el "no tienes permiso" de la sesión
+       * anterior, ya arreglado, como si el problema siguiera ahí.
+       */
+      function limpiarAvisos() {
+        for (const el of document.querySelectorAll(".aviso-error")) {
+          el.textContent = "";
+          el.classList.add("oculto");
+        }
+      }
+
       function pantalla(cual) {
         for (const p of ["pantalla-carga", "pantalla-login", "pantalla-bodas", "pantalla-panel"]) {
           ver($(p), p === cual);
@@ -1927,6 +2098,24 @@
       $("velo").addEventListener("click", () => menuLateral(false));
 
       // ═══ LOGIN ═══
+
+      // La contraseña se escribe a ciegas, y en el celular una letra de más
+      // deja al cliente afuera sin entender por qué. El ojo la muestra.
+      $("btn-ver-clave").addEventListener("click", () => {
+        const campo = $("login-pass");
+        const ojo = $("btn-ver-clave");
+        const mostrando = campo.type === "password";
+
+        campo.type = mostrando ? "text" : "password";
+        ojo.classList.toggle("viendo", mostrando);
+        ojo.setAttribute("aria-pressed", String(mostrando));
+        ojo.setAttribute(
+          "aria-label",
+          mostrando ? "Ocultar la contraseña" : "Mostrar la contraseña"
+        );
+        campo.focus();
+      });
+
       $("form-login").addEventListener("submit", async (e) => {
         e.preventDefault();
         mostrarError("login-error", "");
@@ -2049,6 +2238,7 @@
         invitados = [];
 
         $("login-pass").value = "";
+        limpiarAvisos();
         pantalla("pantalla-login");
         mostrarError("login-error", motivo);
 
@@ -2105,6 +2295,10 @@
 
         // Desde acá hay sesión abierta: se la vigila hasta que se cierre.
         arrancarRelojDeAcceso();
+
+        // Lo que se entra es una sesión nueva: los avisos de la anterior no
+        // tienen nada que ver con ella.
+        limpiarAvisos();
 
         const { data: perfil } = await supabase
           .from("perfiles").select("rol, boda_id").eq("id", session.user.id).maybeSingle();
@@ -2868,42 +3062,70 @@
       }
 
       /**
-       * Confirma en grande que el invitado quedó guardado.
+       * Confirma en grande que el invitado quedó guardado, y se cierra sola.
        *
        * El aviso flotante de dos segundos era fácil de no ver, sobre todo en
        * el celular: el cliente no sabía si había que volver a apretar Agregar.
-       * Esta ventana dice una sola cosa, que es la que hacía falta.
+       * Un botón de "Listo" tampoco servía: se cargan veinte invitados
+       * seguidos y tener que cerrar cada vez cansa. Así que se planta en el
+       * medio, se ve, y se va sola.
        */
+      const DURACION_ALERTA = 2000;
+      let relojAlerta = null;
+
       function mostrarAgregado(inv) {
-        $("agregado-nombre").textContent = inv.nombre;
+        $("alerta-nombre").textContent = inv.nombre;
 
         // Los pases solo se nombran si esta boda los tiene contratados; si no,
         // hablar de pases confundiría al cliente con algo que no compró.
-        $("agregado-pases").textContent = tiene("pases") ? frasePases(inv.pases) : "";
-        ver($("agregado-pases"), tiene("pases"));
+        $("alerta-pases").textContent = tiene("pases") ? frasePases(inv.pases) : "";
+        ver($("alerta-pases"), tiene("pases"));
 
-        ver($("modal-agregado"), true);
+        // La barrita de abajo se vacía en este mismo tiempo. Se lo pasa el
+        // script para que no queden dos números distintos que mantener.
+        const alerta = $("alerta-agregado");
+        alerta.style.setProperty("--duracion", DURACION_ALERTA + "ms");
+
+        // Si venía una alerta anterior, se reinicia el dibujo: sin esto, al
+        // cargar invitados rápido el tilde no se vuelve a dibujar.
+        ver(alerta, false);
+        void alerta.offsetWidth;
+        ver(alerta, true);
+
+        clearTimeout(relojAlerta);
+        relojAlerta = setTimeout(cerrarAlerta, DURACION_ALERTA);
       }
 
-      // Al cerrar, el foco vuelve al nombre: lo normal es cargar varios
-      // invitados seguidos, uno atrás de otro.
-      $("btn-cerrar-agregado").addEventListener("click", () => $("in-nombre").focus());
+      function cerrarAlerta() {
+        clearTimeout(relojAlerta);
+        relojAlerta = null;
+        if ($("alerta-agregado").classList.contains("oculto")) return;
+        ver($("alerta-agregado"), false);
+        // El foco vuelve al nombre: lo normal es cargar varios invitados
+        // seguidos, uno atrás de otro.
+        $("in-nombre")?.focus();
+      }
+
+      // Tocarla la cierra antes de tiempo, para quien no quiere esperar.
+      $("alerta-agregado").addEventListener("click", cerrarAlerta);
 
       // ── Modales ──
       for (const btn of document.querySelectorAll("[data-cerrar-modal]")) {
         btn.addEventListener("click", cerrarModales);
       }
-      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo", "modal-agregado", "modal-importar", "modal-acceso"]) {
+      for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo", "modal-importar", "modal-acceso"]) {
         $(id).addEventListener("click", (e) => {
           if (e.target === $(id)) cerrarModales();
         });
       }
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") cerrarModales();
+        if (e.key !== "Escape") return;
+        cerrarModales();
+        cerrarAlerta();
       });
 
       function cerrarModales() {
-        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo", "modal-agregado", "modal-importar", "modal-acceso"]) {
+        for (const id of ["modal-editar", "modal-borrar", "modal-boda", "modal-asignar", "modal-borrar-boda", "modal-cliente", "modal-listo", "modal-importar", "modal-acceso"]) {
           ver($(id), false);
         }
         for (const id of ["editar-error", "borrar-error", "boda-error", "asignar-error", "borrar-boda-error", "cliente-error", "importar-error", "acceso-error"]) {
