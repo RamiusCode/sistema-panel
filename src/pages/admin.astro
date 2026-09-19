@@ -1082,16 +1082,26 @@
         }
         .barra-acciones .btn { flex: 1 1 auto; justify-content: center; }
 
-        /* Pestañas de filtro: se desliza al costado en vez de ocupar
-           tres renglones de alto */
+        /* Pestañas de filtro: dos por renglón.
+           Deslizándose al costado, las dos últimas quedaban fuera de la
+           pantalla y nadie se enteraba de que estaban: el cliente no encontraba
+           "Sin responder", que es justo la que más mira. Las cuatro en un
+           cuadro de 2x2 entran enteras en el celular más angosto, sin deslizar
+           y sin gastar tres renglones. */
         .filtros {
-          flex-wrap: nowrap;
-          overflow-x: auto;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: .45rem;
           padding: 0 1rem 1rem;
-          scrollbar-width: none;
         }
-        .filtros::-webkit-scrollbar { display: none; }
-        .filtro { flex: none; }
+        .filtro {
+          justify-content: center;
+          gap: .3rem;
+          min-width: 0;
+          padding: .42rem .5rem;
+          font-size: .8rem;
+          white-space: nowrap;
+        }
 
         /* Tarjetas de la lista */
         .tabla tr { padding: .8rem .9rem; }
