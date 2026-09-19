@@ -1872,6 +1872,13 @@
 
       function traducirError(error) {
         if (error.code === "42501" || /row-level security/i.test(error.message)) {
+          // Este mismo error sale en dos casos distintos: el registro de la
+          // boda está cerrado, o al cliente le quitaron el acceso y su
+          // navegador todavía guarda el pase viejo. Se pregunta en el acto
+          // cuál de los dos es, para no hacerlo esperar al reloj de los dos
+          // minutos. Si su usuario sigue existiendo, no pasa nada y el aviso
+          // de acá abajo queda como está.
+          revisarAcceso();
           return "No tienes permiso, o el registro de esta boda está cerrado.";
         }
         if (error.code === "23505") return "Ya existe algo con ese identificador.";
