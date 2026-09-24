@@ -2396,7 +2396,8 @@
         const [resBodas, resInv] = await Promise.all([
           supabase.from("bodas")
             .select("id, slug, nombre, fecha, sitio_url, registro_abierto, funciones, activa")
-            .order("fecha", { ascending: true }),
+            // La última creada arriba: es la que se está armando.
+            .order("creado_en", { ascending: false }),
           supabase.from("invitados").select("boda_id, pases, confirmado, asisten"),
         ]);
 
@@ -2407,14 +2408,6 @@
 
         bodas = resBodas.data ?? [];
         const filas = resInv.data ?? [];
-
-        // Las que ya pasaron se van al final: arriba tiene que quedar lo que
-        // todavía hay que atender.
-        bodas.sort((a, b) => {
-          const ta = yaTermino(a), tb = yaTermino(b);
-          if (ta !== tb) return ta ? 1 : -1;
-          return (a.fecha ?? "9999").localeCompare(b.fecha ?? "9999");
-        });
 
         for (const b of bodas) {
           const suyos = filas.filter((i) => i.boda_id === b.id);
